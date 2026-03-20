@@ -6,3 +6,19 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Capacitor specific
+android/
+ios/
+.gradle
+*.xcworkspace
+*.xcodeproj
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
