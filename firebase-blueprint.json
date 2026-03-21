@@ -1,0 +1,77 @@
+{
+  "entities": {
+    "Product": {
+      "title": "Product",
+      "description": "A product listed in the marketplace",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "price": { "type": "string" },
+        "quantity": { "type": "string" },
+        "location": { "type": "string" },
+        "date": { "type": "string" },
+        "category": { "type": "string" },
+        "badge": { "type": "string" },
+        "description": { "type": "string" },
+        "rating": { "type": "number" },
+        "image": { "type": "string" },
+        "sellerId": { "type": "string" },
+        "sellerName": { "type": "string" },
+        "sellerAvatar": { "type": "string" },
+        "sellerRating": { "type": "number" },
+        "sellerPhone": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "price", "category", "description", "sellerId"]
+    },
+    "Service": {
+      "title": "Service",
+      "description": "A service listed in the marketplace",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "price": { "type": "string" },
+        "location": { "type": "string" },
+        "category": { "type": "string" },
+        "description": { "type": "string" },
+        "rating": { "type": "number" },
+        "image": { "type": "string" },
+        "providerId": { "type": "string" },
+        "providerName": { "type": "string" },
+        "providerAvatar": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "price", "category", "description", "providerId"]
+    },
+    "User": {
+      "title": "User",
+      "description": "A user of the application",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "user"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role"]
+    }
+  },
+  "firestore": {
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Collection of products"
+    },
+    "/services/{serviceId}": {
+      "schema": "Service",
+      "description": "Collection of services"
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Collection of users"
+    }
+  }
+}

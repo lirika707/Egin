@@ -19,6 +19,7 @@ import {
   Settings,
   Star,
   MapPin,
+  Activity,
   ChevronRight,
   Search,
   Filter,
@@ -29,6 +30,7 @@ import {
   Heart,
   TrendingUp,
   TrendingDown,
+  List,
   Wallet,
   Globe,
   Bell,
@@ -61,8 +63,42 @@ import {
   Sun,
   SlidersHorizontal,
   Apple,
+  Scan,
+  FileText,
+  X,
+  AlertTriangle,
+  Mic,
+  Send,
+  Shield,
+  Database,
+  LogOut,
+  LogIn,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { 
+  auth, 
+  db, 
+  signInWithGoogle, 
+  logOut, 
+  collection, 
+  doc, 
+  setDoc, 
+  getDoc, 
+  getDocs, 
+  query, 
+  where, 
+  onSnapshot, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  serverTimestamp, 
+  onAuthStateChanged,
+  FirebaseUser,
+  handleFirestoreError,
+  OperationType,
+  loginWithEmail,
+  registerWithEmail
+} from './firebase';
 
 // --- Types ---
 
@@ -81,12 +117,29 @@ interface Product extends Listing {
   date: string;
   category: string;
   badge?: 'new' | 'popular' | 'top';
+  sellerId?: string;
   seller: {
     name: string;
     avatar: string;
     rating: number;
     phone?: string;
   };
+  createdAt?: any;
+}
+
+interface Service {
+  id: string;
+  name: string;
+  price: string;
+  location: string;
+  category: string;
+  description: string;
+  rating: number;
+  image: string;
+  providerId: string;
+  providerName: string;
+  providerAvatar: string;
+  createdAt?: any;
 }
 
 interface Message {
@@ -143,7 +196,7 @@ interface CommunityCategory {
   chats: CommunityChat[];
 }
 
-type View = 'home' | 'market' | 'details' | 'sell' | 'ai' | 'settings' | 'communities' | 'news_details' | 'community_chats' | 'chat_room';
+type View = 'home' | 'market' | 'details' | 'sell' | 'ai' | 'settings' | 'communities' | 'news_details' | 'community_chats' | 'chat_room' | 'search' | 'admin' | 'services' | 'login';
 type Theme = 'light' | 'dark' | 'system';
 
 // --- Mock Data ---
@@ -334,6 +387,42 @@ const MOCK_PRODUCTS: Product[] = [
     }
   },
   {
+    id: 'm100',
+    name: 'Мед горный "Ат-Баши"',
+    price: '650 сом/кг',
+    quantity: '100 кг',
+    location: 'Нарын',
+    date: 'Сегодня, 11:00',
+    category: 'Мед и продукты пчеловодства',
+    badge: 'popular',
+    description: 'Натуральный белый мед из высокогорья Ат-Баши. Обладает уникальным вкусом и лечебными свойствами. Без добавок и сахара.',
+    rating: 5.0,
+    image: 'https://picsum.photos/seed/honey/800/600',
+    seller: {
+      name: 'Эркинбек Жолдошев',
+      avatar: 'https://picsum.photos/seed/avatar10/150/150',
+      rating: 5.0
+    }
+  },
+  {
+    id: 'm101',
+    name: 'Кумыс свежий',
+    price: '120 сом/л',
+    quantity: '50 л',
+    location: 'Суусамыр',
+    date: 'Сегодня, 06:00',
+    category: 'Молочные продукты',
+    badge: 'new',
+    description: 'Настоящий суусамырский кумыс. Свежий, бодрящий, приготовленный по традиционным рецептам. Доставка каждое утро.',
+    rating: 4.9,
+    image: 'https://picsum.photos/seed/kumys/800/600',
+    seller: {
+      name: 'Гульмира Эсенбаева',
+      avatar: 'https://picsum.photos/seed/avatar11/150/150',
+      rating: 4.9
+    }
+  },
+  {
     id: 'm7',
     name: 'Говядина (четверти)',
     price: '480 сом/кг',
@@ -352,223 +441,87 @@ const MOCK_PRODUCTS: Product[] = [
   },
   {
     id: 'm8',
-    name: 'Баранина (туши)',
-    price: '520 сом/кг',
-    quantity: '80 кг',
-    location: 'Иссык-Куль',
-    date: 'Вчера, 16:45',
-    category: 'Мясо и птица',
-    description: 'Молодая баранина, нежная и без запаха. Идеально для плова и шашлыка.',
-    rating: 4.8,
-    image: 'https://picsum.photos/seed/lamb/800/600',
+    name: 'Молоко домашнее',
+    price: '65 сом/л',
+    quantity: '1 литр',
+    location: 'Чуйская обл.',
+    date: 'Сегодня, 06:00',
+    category: 'Молочные',
+    description: 'Свежее коровье молоко. Жирность 3.8-4.2%. Без добавок.',
+    rating: 4.9,
+    image: 'https://picsum.photos/seed/milk/800/600',
     seller: {
-      name: 'Канат Асанов',
+      name: 'Елена Иванова',
       avatar: 'https://picsum.photos/seed/avatar8/150/150',
-      rating: 4.7
+      rating: 4.8
     }
   },
   {
     id: 'm9',
-    name: 'Молоко домашнее',
-    price: '45 сом/л',
-    quantity: '100 л',
-    location: 'Чуйская обл.',
-    date: 'Сегодня, 06:00',
-    category: 'Яйца и молочные продукты',
-    description: 'Свежее утреннее молоко от домашних коров. Жирность 3.8-4.2%. Без добавок.',
-    rating: 4.9,
-    image: 'https://picsum.photos/seed/milk/800/600',
+    name: 'Виноград "Дамские пальчики"',
+    price: '120 сом/кг',
+    quantity: '50 кг',
+    location: 'Баткенская обл.',
+    date: 'Вчера, 14:00',
+    category: 'Фрукты',
+    description: 'Сладкий, сочный виноград. Прямые поставки из Баткена.',
+    rating: 4.8,
+    image: 'https://picsum.photos/seed/grapes/800/600',
     seller: {
-      name: 'Гульнара Осмонова',
+      name: 'Алишер Каримов',
       avatar: 'https://picsum.photos/seed/avatar9/150/150',
-      rating: 5.0
+      rating: 4.7
     }
   },
   {
     id: 'm10',
-    name: 'Сыр "Сулугуни"',
-    price: '550 сом/кг',
-    quantity: '20 кг',
-    location: 'Ошская обл.',
-    date: '2 дня назад',
-    category: 'Яйца и молочные продукты',
-    description: 'Натуральный сыр ручной работы. Изготовлен по традиционным рецептам.',
+    name: 'Огурцы "Родничок"',
+    price: '45 сом/кг',
+    quantity: '100 кг',
+    location: 'Чуйская обл.',
+    date: 'Сегодня, 08:30',
+    category: 'Овощи',
+    description: 'Хрустящие огурчики, только что с грядки. Идеальны для засолки.',
     rating: 4.7,
-    image: 'https://picsum.photos/seed/cheese/800/600',
+    image: 'https://picsum.photos/seed/cucumber/800/600',
     seller: {
-      name: 'Айнура Бекова',
+      name: 'Татьяна Петрова',
       avatar: 'https://picsum.photos/seed/avatar10/150/150',
-      rating: 4.8
-    }
-  },
-  {
-    id: 'm11',
-    name: 'Семена кукурузы',
-    price: '120 сом/кг',
-    quantity: '200 кг',
-    location: 'Баткенская обл.',
-    date: '4 дня назад',
-    category: 'Удобрения и семена',
-    description: 'Гибридные семена кукурузы с высокой урожайностью. Устойчивы к засухе.',
-    rating: 4.4,
-    image: 'https://picsum.photos/seed/corn/800/600',
-    seller: {
-      name: 'Руслан Исаев',
-      avatar: 'https://picsum.photos/seed/avatar11/150/150',
-      rating: 4.5
-    }
-  },
-  {
-    id: 'm12',
-    name: 'Удобрение "Нитроаммофоска"',
-    price: '65 сом/кг',
-    quantity: '1 тонна',
-    location: 'Чуйская обл.',
-    date: 'Вчера, 11:00',
-    category: 'Удобрения и семена',
-    description: 'Комплексное минеральное удобрение для всех видов культур.',
-    rating: 4.6,
-    image: 'https://picsum.photos/seed/fertilizer/800/600',
-    seller: {
-      name: 'Сергей Волков',
-      avatar: 'https://picsum.photos/seed/avatar12/150/150',
-      rating: 4.7
-    }
-  },
-  {
-    id: 'm13',
-    name: 'Трактор МТЗ-82',
-    price: '850 000 сом',
-    quantity: '1 шт',
-    location: 'Чуйская обл.',
-    date: '5 дней назад',
-    category: 'Техника и запчасти',
-    description: 'Трактор в отличном состоянии. Прошел полное ТО. Готов к полевым работам.',
-    rating: 4.8,
-    image: 'https://picsum.photos/seed/tractor/800/600',
-    seller: {
-      name: 'Виктор Петров',
-      avatar: 'https://picsum.photos/seed/avatar13/150/150',
-      rating: 4.9
-    }
-  },
-  {
-    id: 'm14',
-    name: 'Плуг 3-х корпусный',
-    price: '45 000 сом',
-    quantity: '2 шт',
-    location: 'Ошская обл.',
-    date: 'Сегодня, 12:30',
-    category: 'Техника и запчасти',
-    description: 'Новый плуг для средних тракторов. Усиленная рама.',
-    rating: 4.5,
-    image: 'https://picsum.photos/seed/plow/800/600',
-    seller: {
-      name: 'Алишер Каримов',
-      avatar: 'https://picsum.photos/seed/avatar14/150/150',
       rating: 4.6
     }
   },
   {
-    id: 'm15',
-    name: 'Вспашка земли',
-    price: '3500 сом/га',
-    quantity: 'Услуга',
+    id: 'm11',
+    name: 'Яйца домашние',
+    price: '120 сом/дес',
+    quantity: '10 шт',
     location: 'Чуйская обл.',
-    date: 'Сегодня, 08:00',
-    category: 'Услуги',
-    description: 'Профессиональная вспашка земли трактором. Быстро и качественно.',
+    date: 'Сегодня, 07:00',
+    category: 'Продукты животноводства',
+    description: 'Крупные домашние яйца от кур свободного выгула.',
     rating: 4.9,
-    image: 'https://picsum.photos/seed/field/800/600',
+    image: 'https://picsum.photos/seed/eggs/800/600',
     seller: {
-      name: 'Игорь Смирнов',
-      avatar: 'https://picsum.photos/seed/avatar15/150/150',
-      rating: 5.0
-    }
-  },
-  {
-    id: 'm16',
-    name: 'Перевозка грузов (КамАЗ)',
-    price: '50 сом/км',
-    quantity: 'Услуга',
-    location: 'Весь Кыргызстан',
-    date: 'Вчера, 14:00',
-    category: 'Услуги',
-    description: 'Перевозка сельхозпродукции по всей стране. Опытный водитель.',
-    rating: 4.7,
-    image: 'https://picsum.photos/seed/truck/800/600',
-    seller: {
-      name: 'Данияр Ахметов',
-      avatar: 'https://picsum.photos/seed/avatar16/150/150',
-      rating: 4.8
-    }
-  },
-  {
-    id: 'm17',
-    name: 'Аренда комбайна',
-    price: '4500 сом/га',
-    quantity: 'Услуга',
-    location: 'Таласская обл.',
-    date: '3 дня назад',
-    category: 'Услуги',
-    description: 'Уборка зерновых культур комбайном. Высокая производительность.',
-    rating: 4.6,
-    image: 'https://picsum.photos/seed/combine/800/600',
-    seller: {
-      name: 'Алексей Кузнецов',
-      avatar: 'https://picsum.photos/seed/avatar17/150/150',
-      rating: 4.7
-    }
-  },
-  {
-    id: 'm18',
-    name: 'Консультация агронома',
-    price: '1500 сом/час',
-    quantity: 'Услуга',
-    location: 'Онлайн/Выезд',
-    date: 'Сегодня, 11:00',
-    category: 'Услуги',
-    description: 'Советы по выращиванию культур, борьбе с вредителями и подбору удобрений.',
-    rating: 5.0,
-    image: 'https://picsum.photos/seed/agronomist/800/600',
-    seller: {
-      name: 'Елена Павлова',
-      avatar: 'https://picsum.photos/seed/avatar18/150/150',
-      rating: 5.0
-    }
-  },
-  {
-    id: 'm19',
-    name: 'Мед горный',
-    price: '600 сом/кг',
-    quantity: '50 кг',
-    location: 'Нарынская обл.',
-    date: 'Сегодня, 10:00',
-    category: 'Пчеловодство',
-    description: 'Натуральный мед с высокогорных пастбищ. Очень ароматный и полезный.',
-    rating: 4.9,
-    image: 'https://picsum.photos/seed/honey/800/600',
-    seller: {
-      name: 'Асан Усенов',
-      avatar: 'https://picsum.photos/seed/avatar19/150/150',
+      name: 'Сергей Волков',
+      avatar: 'https://picsum.photos/seed/avatar11/150/150',
       rating: 4.9
     }
   },
   {
-    id: 'm20',
-    name: 'Саженцы абрикоса',
-    price: '250 сом/шт',
-    quantity: '100 шт',
-    location: 'Баткенская обл.',
-    date: 'Вчера, 09:30',
-    category: 'Саженцы и цветы',
-    description: 'Баткенские абрикосы, сорт "Лимонка". Хорошо приживаются.',
-    rating: 4.8,
-    image: 'https://picsum.photos/seed/apricot/800/600',
+    id: 'm12',
+    name: 'Мед горный',
+    price: '600 сом/кг',
+    quantity: '1 кг',
+    location: 'Нарын',
+    date: 'Неделю назад',
+    category: 'Другое',
+    description: 'Натуральный горный мед. Сбор 2023 года. Очень ароматный.',
+    rating: 5.0,
+    image: 'https://picsum.photos/seed/honey/800/600',
     seller: {
-      name: 'Мурат Ибраимов',
-      avatar: 'https://picsum.photos/seed/avatar20/150/150',
-      rating: 4.8
+      name: 'Данияр Саматов',
+      avatar: 'https://picsum.photos/seed/avatar12/150/150',
+      rating: 5.0
     }
   }
 ];
@@ -736,9 +689,124 @@ const MOCK_COMMUNITIES: CommunityCategory[] = [
   }
 ];
 
+// --- Firebase Hooks ---
+
+const useAuth = () => {
+  const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
+  const [userRole, setUserRole] = useState<'admin' | 'user' | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      setCurrentUser(user);
+      if (user) {
+        // Check role in Firestore
+        try {
+          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          if (userDoc.exists()) {
+            setUserRole(userDoc.data().role);
+          } else {
+            // Create user doc if not exists
+            const newUser = {
+              uid: user.uid,
+              email: user.email,
+              displayName: user.displayName,
+              photoURL: user.photoURL,
+              role: user.email === 'nterra552@gmail.com' ? 'admin' : 'user',
+              createdAt: serverTimestamp()
+            };
+            await setDoc(doc(db, 'users', user.uid), newUser);
+            setUserRole(newUser.role as 'admin' | 'user');
+          }
+        } catch (error) {
+          console.error("Error fetching user role:", error);
+        }
+      } else {
+        setUserRole(null);
+      }
+      setLoading(false);
+    });
+    return unsubscribe;
+  }, []);
+
+  return { currentUser, userRole, loading };
+};
+
+const seedDatabase = async () => {
+  if (!auth.currentUser) {
+    alert("Пожалуйста, войдите в систему, чтобы заполнить базу данных.");
+    return;
+  }
+
+  const categories = ['Овощи', 'Фрукты', 'Зерновые', 'Техника', 'Удобрения', 'Животные', 'Молочные продукты', 'Мясо', 'Мед', 'Саженцы'];
+  const locations = ['Чуйская обл.', 'Ошская обл.', 'Джалал-Абад', 'Иссык-Куль', 'Нарын', 'Талас', 'Баткен', 'Бишкек'];
+  
+  console.log("Starting seeding...");
+  
+  // Seed 150 products
+  for (let i = 0; i < 150; i++) {
+    const category = categories[Math.floor(Math.random() * categories.length)];
+    const location = locations[Math.floor(Math.random() * locations.length)];
+    const price = Math.floor(Math.random() * 1000) + 10;
+    
+    const product = {
+      name: `${category} ${['Премиум', 'Отборный', 'Свежий', 'Оптом', 'Эко'][Math.floor(Math.random() * 5)]} #${i + 1}`,
+      price: `${price} сом/кг`,
+      quantity: `${Math.floor(Math.random() * 1000) + 50} кг`,
+      location: location,
+      category: category,
+      description: `Высококачественный продукт из региона ${location}. Свежий урожай, отличные вкусовые качества. Соответствует всем стандартам качества.`,
+      rating: parseFloat((Math.random() * (5 - 3) + 3).toFixed(1)),
+      image: `https://picsum.photos/seed/prod${Date.now() + i}/800/600`,
+      sellerId: auth.currentUser.uid,
+      seller: {
+        name: auth.currentUser.displayName || 'Фермер',
+        avatar: auth.currentUser.photoURL || 'https://picsum.photos/seed/farmer/150/150',
+        rating: 4.9
+      },
+      createdAt: serverTimestamp()
+    };
+    
+    try {
+      await addDoc(collection(db, 'products'), product);
+    } catch (e) {
+      console.error("Error seeding product:", e);
+    }
+  }
+  
+  const serviceCategories = ['Тракторы', 'Уборка', 'Посев', 'Консультации', 'Логистика', 'Аренда склада', 'Ветеринар', 'Агроном'];
+  for (let i = 0; i < 100; i++) {
+    const category = serviceCategories[Math.floor(Math.random() * serviceCategories.length)];
+    const location = locations[Math.floor(Math.random() * locations.length)];
+    const price = Math.floor(Math.random() * 5000) + 500;
+    
+    const service = {
+      name: `${category} сервис ${['Профи', 'Эксперт', 'Быстро', 'Надежно'][Math.floor(Math.random() * 4)]} #${i + 1}`,
+      price: `${price} сом/час`,
+      location: location,
+      category: category,
+      description: `Профессиональные услуги по направлению ${category}. Опытные специалисты, современное оборудование. Гарантия качества и соблюдение сроков.`,
+      rating: parseFloat((Math.random() * (5 - 4) + 4).toFixed(1)),
+      image: `https://picsum.photos/seed/serv${Date.now() + i}/800/600`,
+      providerId: auth.currentUser.uid,
+      providerName: auth.currentUser.displayName || 'АгроСервис',
+      providerAvatar: auth.currentUser.photoURL || 'https://picsum.photos/seed/provider/150/150',
+      createdAt: serverTimestamp()
+    };
+    
+    try {
+      await addDoc(collection(db, 'services'), service);
+    } catch (e) {
+      console.error("Error seeding service:", e);
+    }
+  }
+  
+  alert("База данных успешно заполнена тестовыми данными!");
+};
+
 // --- Components ---
 
-const Header = ({ title, location, showBack, onBack, onAIClick, onAddClick, onMessageClick, onCartClick, isHome }: { title: string; location?: string; showBack?: boolean; onBack?: () => void; onAIClick?: () => void; onAddClick?: () => void; onMessageClick?: () => void; onCartClick?: () => void; isHome?: boolean }) => (
+const Header = ({ title, location, showBack, onBack, onAddClick, onMessageClick, onCartClick, isHome }: { title: string; location?: string; showBack?: boolean; onBack?: () => void; onAddClick?: () => void; onMessageClick?: () => void; onCartClick?: () => void; isHome?: boolean }) => (
   <header className={`flex flex-col ${isHome ? 'bg-transparent absolute top-0 left-0 right-0' : 'bg-white/80 dark:bg-slate-900/80 backdrop-blur-md sticky top-0 border-b border-slate-100 dark:border-slate-800'} z-50`}>
     <div className="flex items-center justify-between px-6 py-4">
       <div className="flex items-center gap-3">
@@ -769,12 +837,6 @@ const Header = ({ title, location, showBack, onBack, onAIClick, onAddClick, onMe
       </div>
       <div className="flex items-center gap-2">
         <button 
-          onClick={onAIClick}
-          className={`p-2.5 rounded-full border active:scale-95 transition-transform ${isHome ? 'bg-white/20 backdrop-blur-md text-white border-white/20' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700'}`}
-        >
-          <Sparkles size={18} className="text-brand-600 dark:text-brand-400" />
-        </button>
-        <button 
           onClick={onMessageClick}
           className={`p-2.5 rounded-full border active:scale-95 transition-transform ${isHome ? 'bg-white/20 backdrop-blur-md text-white border-white/20' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700'}`}
         >
@@ -798,234 +860,294 @@ const Header = ({ title, location, showBack, onBack, onAIClick, onAddClick, onMe
           className={`p-2.5 rounded-full border relative active:scale-95 transition-transform ${isHome ? 'bg-white/20 backdrop-blur-md text-white border-white/20' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700'}`}
         >
           <Bell size={18} />
-          <span className="absolute top-2.5 right-2.5 w-1.5 h-1.5 bg-red-500 rounded-full"></span>
+          <div className="absolute top-2 right-2 w-2 h-2 bg-brand-500 rounded-full border-2 border-white dark:border-slate-900"></div>
         </button>
       </div>
     </div>
   </header>
 );
 
-const UnifiedAICard = () => (
-  <div className="relative w-full min-h-[850px] overflow-hidden bg-slate-50 dark:bg-slate-950 transition-colors duration-500">
-    {/* Abstract AI Background Elements */}
-    <div className="absolute inset-0 z-0 overflow-hidden">
-      <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-brand-600/10 dark:bg-brand-600/20 rounded-full blur-[120px] animate-pulse" />
-      <div className="absolute bottom-[10%] right-[-10%] w-[50%] h-[50%] bg-emerald-600/5 dark:bg-emerald-600/10 rounded-full blur-[100px]" />
-      <div className="absolute top-[30%] right-[10%] w-[30%] h-[30%] bg-blue-600/5 dark:bg-blue-600/10 rounded-full blur-[80px] animate-pulse" style={{ animationDuration: '4s' }} />
-      
-      {/* Subtle Grid Overlay */}
-      <div className="absolute inset-0 opacity-[0.05] dark:opacity-[0.03] pointer-events-none" 
-           style={{ backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
-    </div>
+const UnifiedAICard = ({ onScanClick }: { onScanClick: () => void }) => {
+  const [activeInsight, setActiveInsight] = useState<'advice' | 'scan' | 'market'>('advice');
 
-    <div className="relative z-10 pt-24 px-6 pb-16 space-y-8">
-      {/* 1. Main Weather & 7-Day Forecast */}
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-white/40 dark:bg-white/5 backdrop-blur-2xl rounded-[3rem] border border-slate-200 dark:border-white/10 p-7 text-slate-900 dark:text-white shadow-xl dark:shadow-2xl transition-all"
-      >
-        <div className="flex justify-between items-center mb-8">
-          <div className="flex items-center gap-2.5">
-            <div className="p-1.5 bg-slate-900/5 dark:bg-white/10 rounded-lg">
-              <Sun size={14} className="text-brand-600 dark:text-brand-400" />
-            </div>
-            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 dark:text-white/60">Прогноз на 7 дней</span>
-          </div>
-          <div className="px-4 py-1.5 bg-slate-900/5 dark:bg-white/10 backdrop-blur-md rounded-full border border-slate-200 dark:border-white/10">
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-white/80">Бишкек</span>
-          </div>
-        </div>
+  return (
+    <div className="relative w-full min-h-[850px] overflow-hidden bg-slate-50 dark:bg-slate-950 transition-colors duration-500">
+      {/* Abstract AI Background Elements */}
+      <div className="absolute inset-0 z-0 overflow-hidden">
+        <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-brand-600/10 dark:bg-brand-600/20 rounded-full blur-[120px] animate-pulse" />
+        <div className="absolute bottom-[10%] right-[-10%] w-[50%] h-[50%] bg-emerald-600/5 dark:bg-emerald-600/10 rounded-full blur-[100px]" />
+        <div className="absolute top-[30%] right-[10%] w-[30%] h-[30%] bg-blue-600/5 dark:bg-blue-600/10 rounded-full blur-[80px] animate-pulse" style={{ animationDuration: '4s' }} />
+        
+        {/* Subtle Grid Overlay */}
+        <div className="absolute inset-0 opacity-[0.05] dark:opacity-[0.03] pointer-events-none" 
+             style={{ backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
+      </div>
 
-        <div className="flex justify-between items-center mb-10">
-          <div className="text-left">
-            <h2 className="text-7xl font-thin tracking-tighter">28°</h2>
-            <div className="flex items-center gap-2 mt-2">
-              <span className="w-2 h-2 bg-emerald-500 rounded-full animate-ping" />
-              <p className="text-xs font-black text-slate-500 dark:text-white/60 uppercase tracking-widest">Солнечно</p>
+      <div className="relative z-10 pt-24 px-6 pb-16 flex flex-col gap-6">
+        {/* 1. Integrated Super Card: Weather + AI Insights */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white/40 dark:bg-white/5 backdrop-blur-2xl rounded-[3.5rem] border border-slate-200 dark:border-white/10 p-8 text-slate-900 dark:text-white shadow-2xl relative overflow-hidden"
+        >
+          {/* Weather Section - Now with AI Overlays */}
+          <div className="mb-8">
+            <div className="flex justify-between items-center mb-8">
+              <div className="flex items-center gap-2.5">
+                <div className="p-1.5 bg-slate-900/5 dark:bg-white/10 rounded-lg">
+                  <Sparkles size={14} className="text-brand-600 dark:text-brand-400" />
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 dark:text-white/60">AI Weather Intelligence</span>
+              </div>
+              <div className="px-4 py-1.5 bg-slate-900/5 dark:bg-white/10 backdrop-blur-md rounded-full border border-slate-200 dark:border-white/10 flex items-center gap-2">
+                <MapPin size={10} className="text-brand-600" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-white/80">Бишкек</span>
+              </div>
             </div>
-          </div>
-          <div className="flex flex-col items-end gap-3">
-            <div className="flex items-center gap-3 px-3 py-2 bg-slate-900/5 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/5">
-              <Wind size={16} className="text-brand-600 dark:text-brand-400" />
-              <span className="text-sm font-black">4.2 м/с</span>
-            </div>
-            <div className="flex items-center gap-3 px-3 py-2 bg-slate-900/5 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/5">
-              <Droplets size={16} className="text-emerald-600 dark:text-emerald-400" />
-              <span className="text-sm font-black">42%</span>
-            </div>
-          </div>
-        </div>
 
-        {/* 7-Day Mini Forecast */}
-        <div className="flex justify-between items-center gap-3 overflow-x-auto no-scrollbar pb-2">
+            <div className="flex justify-between items-start mb-10">
+              <div className="text-left">
+                <div className="flex items-baseline gap-1">
+                  <h2 className="text-8xl font-thin tracking-tighter">28</h2>
+                  <span className="text-4xl font-light text-brand-600">°</span>
+                </div>
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="w-2 h-2 bg-emerald-500 rounded-full animate-ping" />
+                  <p className="text-xs font-black text-slate-500 dark:text-white/60 uppercase tracking-widest">Солнечно</p>
+                </div>
+              </div>
+              
+              <div className="flex flex-col items-end gap-3">
+                {/* AI-Enhanced Weather Metrics */}
+                <div className="flex items-center gap-3 px-4 py-2.5 bg-white/50 dark:bg-white/5 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-white/5 shadow-sm">
+                  <Wind size={16} className="text-brand-600 dark:text-brand-400" />
+                  <div className="flex flex-col">
+                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-tighter">Ветер</span>
+                    <span className="text-sm font-black">4.2 м/с</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 px-4 py-2.5 bg-white/50 dark:bg-white/5 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-white/5 shadow-sm">
+                  <Droplets size={16} className="text-emerald-600 dark:text-emerald-400" />
+                  <div className="flex flex-col">
+                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-tighter">Влажность</span>
+                    <span className="text-sm font-black">42%</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 px-4 py-2.5 bg-blue-500/10 dark:bg-blue-500/20 backdrop-blur-md rounded-2xl border border-blue-200/20 dark:border-blue-400/20 shadow-sm">
+                  <Activity size={16} className="text-blue-600 dark:text-blue-400" />
+                  <div className="flex flex-col">
+                    <span className="text-[8px] font-black text-blue-500 uppercase tracking-tighter">Почва (AI)</span>
+                    <span className="text-sm font-black text-blue-600 dark:text-blue-400">75%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 7-Day Mini Forecast */}
+            <div className="flex justify-between items-center gap-3 overflow-x-auto no-scrollbar pb-4">
+              {[
+                { day: 'Пн', temp: '28°', icon: Sun, active: true },
+                { day: 'Вт', temp: '26°', icon: Cloud },
+                { day: 'Ср', temp: '24°', icon: CloudRain },
+                { day: 'Чт', temp: '27°', icon: Sun },
+                { day: 'Пт', temp: '29°', icon: Sun },
+                { day: 'Сб', temp: '30°', icon: Sun },
+                { day: 'Вс', temp: '25°', icon: Cloud },
+              ].map((d, i) => (
+                <div key={i} className={`flex flex-col items-center gap-3 min-w-[52px] py-4 rounded-[1.5rem] border transition-all ${d.active ? 'bg-brand-600 border-brand-500 shadow-lg shadow-brand-600/20 text-white' : 'bg-slate-900/5 dark:bg-white/5 border-slate-200 dark:border-white/5 hover:bg-slate-900/10 dark:hover:bg-white/10'}`}>
+                  <span className={`text-[10px] font-black uppercase tracking-tighter ${d.active ? 'text-white' : 'text-slate-400 dark:text-white/40'}`}>{d.day}</span>
+                  <d.icon size={18} className={d.active ? 'text-white' : 'text-slate-600 dark:text-white/60'} />
+                  <span className="text-xs font-black">{d.temp}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* AI Insights Integration Layer */}
+          <div className="relative mt-4 pt-8 border-t border-slate-200 dark:border-white/10">
+            {/* AI Insights Tabs - Styled as "Smart Modes" */}
+            <div className="flex gap-2 mb-8 p-1.5 bg-slate-900/5 dark:bg-white/5 rounded-[2rem] border border-slate-200 dark:border-white/10">
+              {[
+                { id: 'advice', label: 'Советы', icon: Sparkles },
+                { id: 'scan', label: 'Сканер', icon: Scan },
+                { id: 'market', label: 'Рынок', icon: TrendingUp },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveInsight(tab.id as any)}
+                  className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${activeInsight === tab.id ? 'bg-white dark:bg-slate-900 text-brand-600 shadow-sm border border-slate-100 dark:border-white/10' : 'text-slate-400 dark:text-white/40 hover:text-slate-600 dark:hover:text-white/60'}`}
+                >
+                  <tab.icon size={14} />
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* AI Insight Content Area */}
+            <AnimatePresence mode="wait">
+              {activeInsight === 'advice' && (
+                <motion.div
+                  key="advice"
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  className="space-y-6"
+                >
+                  <div className="flex items-start gap-6">
+                    <div className="p-4 bg-brand-600 rounded-[1.5rem] shadow-xl shadow-brand-600/40 shrink-0">
+                      <Sparkles size={24} className="text-white" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-[8px] font-black text-brand-600 dark:text-brand-400 uppercase tracking-widest">AI Recommendation</span>
+                        <div className="h-px flex-1 bg-brand-600/20" />
+                      </div>
+                      <h4 className="text-xl font-black leading-tight mb-2 tracking-tight">Оптимизация полива</h4>
+                      <p className="text-sm font-medium leading-relaxed text-slate-600 dark:text-white/80">
+                        Ожидается пик инсоляции. <span className="text-brand-600 dark:text-brand-400 font-black">AI рекомендует</span> перенести полив на <span className="text-slate-900 dark:text-white font-black underline decoration-brand-500 underline-offset-4">07:30 утра</span>.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <button className="flex items-center justify-center gap-2 py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-950 rounded-2xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-transform">
+                      Применить <ArrowRight size={14} />
+                    </button>
+                    <button className="flex items-center justify-center gap-2 py-3 bg-slate-900/5 dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-transform text-slate-600 dark:text-white">
+                      Анализ <ChevronRight size={14} />
+                    </button>
+                    <button 
+                      onClick={() => {
+                        if (navigator.share) {
+                          navigator.share({
+                            title: 'AI Совет для фермера',
+                            text: 'AI рекомендует перенести полив на 07:30 утра для предотвращения испарения.',
+                            url: window.location.href,
+                          }).catch(() => {});
+                        }
+                      }}
+                      className="flex items-center justify-center gap-2 py-3 bg-slate-900/5 dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-transform text-slate-600 dark:text-white"
+                    >
+                      <Share2 size={14} />
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+
+              {activeInsight === 'scan' && (
+                <motion.div
+                  key="scan"
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  className="space-y-6"
+                >
+                  <div className="flex items-start gap-6">
+                    <div className="p-4 bg-emerald-600 rounded-[1.5rem] shadow-xl shadow-emerald-600/40 shrink-0">
+                      <Scan size={24} className="text-white" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-[8px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">AI Vision System</span>
+                        <div className="h-px flex-1 bg-emerald-600/20" />
+                      </div>
+                      <h4 className="text-xl font-black leading-tight mb-2 tracking-tight">Crop Recognition</h4>
+                      <p className="text-sm font-medium leading-relaxed text-slate-600 dark:text-white/80">
+                        Загрузите фото урожая для мгновенного анализа болезней и стадии роста.
+                      </p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={onScanClick}
+                    className="w-full flex items-center justify-center gap-3 py-4 bg-emerald-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest active:scale-95 transition-all shadow-lg shadow-emerald-600/20"
+                  >
+                    <Camera size={18} />
+                    Сканировать урожай
+                  </button>
+                </motion.div>
+              )}
+
+              {activeInsight === 'market' && (
+                <motion.div
+                  key="market"
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  className="space-y-6"
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Market Intelligence</span>
+                    <div className="h-px flex-1 bg-slate-200 dark:bg-white/10" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-4 bg-slate-900/5 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10">
+                      <div className="flex justify-between items-end mb-2">
+                        <span className="text-[10px] font-black text-slate-500 dark:text-white/60 uppercase">Картофель</span>
+                        <span className="text-sm font-black">16 с/кг</span>
+                      </div>
+                      <div className="h-1.5 w-full bg-slate-900/5 dark:bg-white/5 rounded-full overflow-hidden">
+                        <div className="h-full bg-emerald-500 w-[65%]" />
+                      </div>
+                    </div>
+                    <div className="p-4 bg-slate-900/5 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10">
+                      <div className="flex justify-between items-end mb-2">
+                        <span className="text-[10px] font-black text-slate-500 dark:text-white/60 uppercase">Морковь</span>
+                        <span className="text-sm font-black">22 с/кг</span>
+                      </div>
+                      <div className="h-1.5 w-full bg-slate-900/5 dark:bg-white/5 rounded-full overflow-hidden">
+                        <div className="h-full bg-brand-600 w-[45%]" />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="p-4 bg-blue-500/10 dark:bg-blue-500/20 rounded-3xl border border-blue-200/20 dark:border-blue-400/20 flex justify-between items-center">
+                    <div>
+                      <p className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-1">Влажность почвы</p>
+                      <span className="text-2xl font-black">75%</span>
+                    </div>
+                    <div className="p-3 bg-blue-500/20 rounded-2xl">
+                      <Droplets size={20} className="text-blue-600 dark:text-blue-400" />
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </motion.div>
+
+        {/* Quick Crop Actions (Small Grid) */}
+        <div className="grid grid-cols-4 gap-4">
           {[
-            { day: 'Пн', temp: '28°', icon: Sun, active: true },
-            { day: 'Вт', temp: '26°', icon: Cloud },
-            { day: 'Ср', temp: '24°', icon: CloudRain },
-            { day: 'Чт', temp: '27°', icon: Sun },
-            { day: 'Пт', temp: '29°', icon: Sun },
-            { day: 'Сб', temp: '30°', icon: Sun },
-            { day: 'Вс', temp: '25°', icon: Cloud },
-          ].map((d, i) => (
-            <div key={i} className={`flex flex-col items-center gap-3 min-w-[52px] py-4 rounded-[1.5rem] border transition-all ${d.active ? 'bg-brand-600 border-brand-500 shadow-lg shadow-brand-600/20 text-white' : 'bg-slate-900/5 dark:bg-white/5 border-slate-200 dark:border-white/5 hover:bg-slate-900/10 dark:hover:bg-white/10'}`}>
-              <span className={`text-[10px] font-black uppercase tracking-tighter ${d.active ? 'text-white' : 'text-slate-400 dark:text-white/40'}`}>{d.day}</span>
-              <d.icon size={18} className={d.active ? 'text-white' : 'text-slate-600 dark:text-white/60'} />
-              <span className="text-xs font-black">{d.temp}</span>
-            </div>
+            { name: 'Apple', seed: 'apple', color: 'from-red-500/10 dark:from-red-500/20' },
+            { name: 'Tomato', seed: 'tomato', color: 'from-orange-500/10 dark:from-orange-500/20' },
+            { name: 'Onion', seed: 'onion', color: 'from-yellow-500/10 dark:from-yellow-500/20' },
+            { name: 'Wheat', seed: 'wheat', color: 'from-emerald-500/10 dark:from-emerald-500/20' },
+          ].map((crop, i) => (
+            <motion.div 
+              key={i}
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.4 + i * 0.1 }}
+              whileTap={{ scale: 0.9 }}
+              className={`bg-gradient-to-b ${crop.color} to-white/5 backdrop-blur-md rounded-[1.5rem] border border-slate-200 dark:border-white/10 p-3 flex flex-col items-center gap-2 cursor-pointer shadow-sm dark:shadow-none`}
+            >
+              <div className="w-12 h-12 rounded-xl overflow-hidden bg-slate-900/5 dark:bg-white/5 p-1.5">
+                <img 
+                  src={`https://api.dicebear.com/7.x/identicon/svg?seed=${crop.seed}`} 
+                  alt={crop.name} 
+                  className="w-full h-full object-contain opacity-60 dark:opacity-80"
+                />
+              </div>
+              <span className="text-[9px] font-black text-slate-500 dark:text-white/60 uppercase tracking-tighter">{crop.name}</span>
+            </motion.div>
           ))}
         </div>
-      </motion.div>
-
-      {/* 2. AI Farmer's Advice (High-Tech Design) */}
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="bg-gradient-to-br from-brand-50 to-emerald-50 dark:from-brand-600/20 dark:to-emerald-600/20 backdrop-blur-3xl rounded-[3rem] border border-slate-200 dark:border-white/10 p-8 text-slate-900 dark:text-white shadow-xl dark:shadow-2xl relative group overflow-hidden"
-      >
-        <div className="absolute top-0 right-0 w-40 h-40 bg-brand-500/10 dark:bg-brand-500/20 rounded-full -mr-20 -mt-20 blur-3xl group-hover:bg-brand-500/20 dark:group-hover:bg-brand-500/30 transition-all duration-700" />
-        
-        <div className="flex items-start gap-6 relative z-10">
-          <div className="relative">
-            <div className="p-4 bg-brand-600 rounded-[1.5rem] shadow-xl shadow-brand-600/40 relative z-10">
-              <Sparkles size={28} className="text-white" />
-            </div>
-            <div className="absolute inset-0 bg-brand-600 rounded-[1.5rem] blur-xl opacity-50 animate-pulse" />
-          </div>
-          
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="h-[1px] w-4 bg-brand-600 dark:bg-brand-400" />
-              <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-brand-600 dark:text-brand-400">AI Intelligence</h3>
-            </div>
-            <h4 className="text-xl font-black leading-tight mb-3 tracking-tight">Оптимизация полива</h4>
-            <p className="text-sm font-medium leading-relaxed text-slate-600 dark:text-white/80">
-              Ожидается пик инсоляции. <span className="text-brand-600 dark:text-brand-400 font-black">AI рекомендует</span> перенести полив на <span className="text-slate-900 dark:text-white font-black underline decoration-brand-500 underline-offset-4">07:30 утра</span> для предотвращения испарения.
-            </p>
-            
-            <div className="mt-6 grid grid-cols-2 gap-3">
-              <button className="flex items-center justify-center gap-2 py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-950 rounded-2xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-transform">
-                Применить <ArrowRight size={14} />
-              </button>
-              <button className="flex items-center justify-center gap-2 py-3 bg-slate-900/5 dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-transform text-slate-600 dark:text-white">
-                Анализ <ChevronRight size={14} />
-              </button>
-            </div>
-          </div>
-        </div>
-      </motion.div>
-
-      {/* 3. Market Intelligence & Soil */}
-      <div className="grid grid-cols-2 gap-5">
-        {/* Market Intelligence */}
-        <motion.div 
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.2 }}
-          className="bg-white/40 dark:bg-white/5 backdrop-blur-2xl rounded-[2.5rem] border border-slate-200 dark:border-white/10 p-6 text-slate-900 dark:text-white shadow-lg dark:shadow-none"
-        >
-          <div className="flex items-center justify-between mb-6">
-            <div className="p-2 bg-emerald-500/10 dark:bg-emerald-500/20 rounded-xl">
-              <TrendingUp size={16} className="text-emerald-600 dark:text-emerald-400" />
-            </div>
-            <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-white/40">Market AI</span>
-          </div>
-          <div className="space-y-4">
-            <div>
-              <div className="flex justify-between items-end mb-1">
-                <span className="text-[10px] font-black text-slate-500 dark:text-white/60 uppercase">Картофель</span>
-                <span className="text-sm font-black">16 с/кг</span>
-              </div>
-              <div className="h-1.5 w-full bg-slate-900/5 dark:bg-white/5 rounded-full overflow-hidden">
-                <motion.div initial={{ width: 0 }} animate={{ width: '65%' }} className="h-full bg-emerald-500 dark:bg-emerald-400" />
-              </div>
-            </div>
-            <div>
-              <div className="flex justify-between items-end mb-1">
-                <span className="text-[10px] font-black text-slate-500 dark:text-white/60 uppercase">Морковь</span>
-                <span className="text-sm font-black">22 с/кг</span>
-              </div>
-              <div className="h-1.5 w-full bg-slate-900/5 dark:bg-white/5 rounded-full overflow-hidden">
-                <motion.div initial={{ width: 0 }} animate={{ width: '45%' }} className="h-full bg-brand-600 dark:bg-brand-400" />
-              </div>
-            </div>
-            <div className="pt-2 flex items-center gap-2">
-              <div className="w-1.5 h-1.5 bg-emerald-500 dark:bg-emerald-400 rounded-full" />
-              <p className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">+4.2% Тренд</p>
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Soil Intelligence */}
-        <motion.div 
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.3 }}
-          className="bg-white/40 dark:bg-white/5 backdrop-blur-2xl rounded-[2.5rem] border border-slate-200 dark:border-white/10 p-6 text-slate-900 dark:text-white shadow-lg dark:shadow-none flex flex-col justify-between"
-        >
-          <div className="flex items-center justify-between">
-            <div className="p-2 bg-blue-500/10 dark:bg-blue-500/20 rounded-xl">
-              <Droplets size={16} className="text-blue-600 dark:text-blue-400" />
-            </div>
-            <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-white/40">Soil AI</span>
-          </div>
-          
-          <div className="py-2">
-            <div className="flex items-baseline gap-1">
-              <span className="text-4xl font-black">75</span>
-              <span className="text-sm font-black text-slate-400 dark:text-white/40">%</span>
-            </div>
-            <p className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest mt-1">Оптимально</p>
-          </div>
-
-          <div className="flex gap-1 h-8 items-end">
-            {[0.4, 0.6, 0.8, 0.5, 0.9, 0.7, 0.8].map((h, i) => (
-              <motion.div 
-                key={i}
-                initial={{ height: 0 }}
-                animate={{ height: `${h * 100}%` }}
-                transition={{ delay: 0.5 + i * 0.05 }}
-                className="flex-1 bg-slate-900/10 dark:bg-white/20 rounded-t-sm"
-              />
-            ))}
-          </div>
-        </motion.div>
-      </div>
-
-      {/* 4. AI Crop Recognition (Quick Actions) */}
-      <div className="grid grid-cols-4 gap-4">
-        {[
-          { name: 'Apple', seed: 'apple', color: 'from-red-500/10 dark:from-red-500/20' },
-          { name: 'Tomato', seed: 'tomato', color: 'from-orange-500/10 dark:from-orange-500/20' },
-          { name: 'Onion', seed: 'onion', color: 'from-yellow-500/10 dark:from-yellow-500/20' },
-          { name: 'Wheat', seed: 'wheat', color: 'from-emerald-500/10 dark:from-emerald-500/20' },
-        ].map((crop, i) => (
-          <motion.div 
-            key={i}
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.4 + i * 0.1 }}
-            whileTap={{ scale: 0.9 }}
-            className={`bg-gradient-to-b ${crop.color} to-white/5 backdrop-blur-md rounded-[1.5rem] border border-slate-200 dark:border-white/10 p-3 flex flex-col items-center gap-2 cursor-pointer shadow-sm dark:shadow-none`}
-          >
-            <div className="w-12 h-12 rounded-xl overflow-hidden bg-slate-900/5 dark:bg-white/5 p-1.5">
-              <img 
-                src={`https://api.dicebear.com/7.x/identicon/svg?seed=${crop.seed}`} 
-                alt={crop.name} 
-                className="w-full h-full object-contain opacity-60 dark:opacity-80"
-              />
-            </div>
-            <span className="text-[9px] font-black text-slate-500 dark:text-white/60 uppercase tracking-tighter">{crop.name}</span>
-          </motion.div>
-        ))}
       </div>
     </div>
-  </div>
-);
+  );
+};
 
-const ListingCard: React.FC<{ listing: Listing; onClick?: () => void }> = ({ listing, onClick }) => {
+const ListingCard: React.FC<{ listing: Listing | Product; onClick?: () => void }> = ({ listing, onClick }) => {
   const [count, setCount] = useState(1);
+  const product = listing as Product;
 
   return (
     <motion.div 
@@ -1041,13 +1163,18 @@ const ListingCard: React.FC<{ listing: Listing; onClick?: () => void }> = ({ lis
           referrerPolicy="no-referrer"
         />
         <div className="absolute top-3 right-3 bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm p-1.5 rounded-full text-slate-300 dark:text-slate-600 shadow-sm">
-          <Star size={14} />
+          <Star size={14} className={listing.rating > 4 ? "text-yellow-500 fill-yellow-500" : ""} />
         </div>
+        {product.badge && (
+          <div className="absolute top-3 left-3 px-2 py-0.5 bg-brand-600 text-white text-[8px] font-black uppercase rounded-lg shadow-lg">
+            {product.badge === 'new' ? 'Новое' : product.badge === 'popular' ? 'Хит' : 'Топ'}
+          </div>
+        )}
       </div>
       <div className="p-4 flex flex-col flex-1">
         <div className="mb-1">
-          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold">{listing.price} за 1 кг</span>
-          <h4 className="font-bold text-slate-900 dark:text-white text-sm leading-tight mt-0.5">{listing.name}</h4>
+          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold">{listing.price} {listing.quantity ? `за ${listing.quantity}` : 'за 1 кг'}</span>
+          <h4 className="font-bold text-slate-900 dark:text-white text-sm leading-tight mt-0.5 truncate">{listing.name}</h4>
         </div>
         
         <div className="mt-auto pt-3 flex items-center justify-between gap-2">
@@ -1076,12 +1203,12 @@ const ListingCard: React.FC<{ listing: Listing; onClick?: () => void }> = ({ lis
 };
 
 
-const ActionButtons = ({ onMarketClick }: { onMarketClick: () => void }) => (
+const ActionButtons = ({ onMarketClick, onAIClick }: { onMarketClick: () => void; onAIClick: () => void }) => (
   <div className="grid grid-cols-3 gap-4 mx-6 mt-8">
     {[
       { label: 'Купить', icon: ShoppingBag, color: 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white border-slate-100 dark:border-slate-800', onClick: onMarketClick },
       { label: 'Продать', icon: PlusCircle, color: 'bg-brand-600 text-white border-brand-600 shadow-lg shadow-brand-500/20', onClick: () => {} },
-      { label: 'AI Помощь', icon: MessageSquare, color: 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white border-slate-100 dark:border-slate-800', onClick: () => {} },
+      { label: 'AI Помощь', icon: MessageSquare, color: 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white border-slate-100 dark:border-slate-800', onClick: onAIClick },
     ].map((btn, i) => (
       <motion.button
         key={btn.label}
@@ -1186,21 +1313,38 @@ const BlogSection = ({ onPostClick }: { onPostClick: (post: any) => void }) => (
 );
 
 
-const ListingsSection = ({ onListingClick }: { onListingClick: (id: string) => void }) => (
-  <section className="mt-8">
-    <div className="flex items-center justify-between px-6 mb-4">
-      <h3 className="text-lg font-bold text-slate-900 dark:text-white uppercase tracking-tight">
-        Свежие <span className="text-brand-600 dark:text-brand-400">предложения</span>
-      </h3>
-      <button className="text-brand-600 dark:text-brand-400 text-xs font-bold">Смотреть все</button>
-    </div>
-    <div className="flex gap-4 overflow-x-auto no-scrollbar px-6 pb-4">
-      {MOCK_LISTINGS.map(listing => (
-        <ListingCard key={listing.id} listing={listing} onClick={() => onListingClick(listing.id)} />
-      ))}
-    </div>
-  </section>
-);
+const ListingsSection = ({ onListingClick }: { onListingClick: (id: string) => void }) => {
+  const [products, setProducts] = useState<Product[]>([]);
+
+  useEffect(() => {
+    const q = query(collection(db, 'products'), where('createdAt', '!=', null));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const pList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
+      setProducts(pList);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'products');
+    });
+    return unsubscribe;
+  }, []);
+
+  const displayProducts = products.length > 0 ? products.slice(0, 10) : MOCK_LISTINGS;
+
+  return (
+    <section className="mt-8">
+      <div className="flex items-center justify-between px-6 mb-4">
+        <h3 className="text-lg font-bold text-slate-900 dark:text-white uppercase tracking-tight">
+          Свежие <span className="text-brand-600 dark:text-brand-400">предложения</span>
+        </h3>
+        <button className="text-brand-600 dark:text-brand-400 text-xs font-bold">Смотреть все</button>
+      </div>
+      <div className="flex gap-4 overflow-x-auto no-scrollbar px-6 pb-4">
+        {displayProducts.map(listing => (
+          <ListingCard key={listing.id} listing={listing} onClick={() => onListingClick(listing.id)} />
+        ))}
+      </div>
+    </section>
+  );
+};
 
 // --- Marketplace Components ---
 
@@ -1240,58 +1384,130 @@ const SubcategoryChips = ({ selected, onSelect }: { selected: string; onSelect: 
   </div>
 );
 
-const ProductCard: React.FC<{ product: Product; onClick?: () => void }> = ({ product, onClick }) => (
-  <motion.div 
-    initial={{ opacity: 0, y: 20 }}
-    animate={{ opacity: 1, y: 0 }}
-    whileTap={{ scale: 0.98 }}
-    onClick={onClick}
-    className="bg-white dark:bg-slate-900 rounded-[2rem] p-3 border border-slate-100 dark:border-slate-800 shadow-sm group relative"
-  >
-    <div className="relative aspect-square rounded-[1.5rem] overflow-hidden bg-slate-50 dark:bg-slate-800 mb-3">
-      <img 
-        src={product.image} 
-        alt={product.name} 
-        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-        referrerPolicy="no-referrer"
-      />
-      <button 
-        className="absolute top-2 right-2 w-7 h-7 bg-white/80 backdrop-blur-md rounded-full flex items-center justify-center text-slate-400 hover:text-brand-600 transition-colors"
-        onClick={(e) => {
-          e.stopPropagation();
-        }}
+const ProductCard: React.FC<{ 
+  product: Product; 
+  onClick?: () => void; 
+  onAddClick?: (e: React.MouseEvent) => void;
+  viewMode?: 'grid' | 'list';
+}> = ({ product, onClick, onAddClick, viewMode = 'grid' }) => {
+  if (viewMode === 'list') {
+    return (
+      <motion.div 
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        whileTap={{ scale: 0.98 }}
+        onClick={onClick}
+        className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-md transition-all group flex gap-4 cursor-pointer"
       >
-        <Heart size={14} />
-      </button>
-    </div>
-    <div className="px-1 pb-1">
-      <h4 className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1 line-clamp-1">{product.name}</h4>
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-black text-slate-900 dark:text-white">{product.price}</span>
-        <div className="flex items-center gap-0.5">
-          <Star size={10} className="text-yellow-500 fill-yellow-500" />
-          <span className="text-[10px] font-bold text-slate-900 dark:text-white">{product.rating}</span>
+        <div className="relative w-24 h-24 shrink-0 rounded-xl overflow-hidden bg-slate-50 dark:bg-slate-800">
+          <img 
+            src={product.image} 
+            alt={product.name} 
+            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+            referrerPolicy="no-referrer"
+          />
+          {product.badge && (
+            <div className="absolute top-1 left-1 px-1.5 py-0.5 bg-brand-600 text-white text-[8px] font-black uppercase rounded-md shadow-sm">
+              {product.badge === 'new' ? 'Новое' : product.badge === 'popular' ? 'Хит' : 'Топ'}
+            </div>
+          )}
+        </div>
+        <div className="flex-1 flex flex-col justify-between min-w-0">
+          <div>
+            <div className="flex justify-between items-start gap-2">
+              <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">{product.name}</h4>
+              <span className="text-sm font-black text-brand-600 dark:text-brand-400 whitespace-nowrap">{product.price}</span>
+            </div>
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 mb-1">{product.quantity || '1 кг'} • {product.location}</p>
+            <p className="text-[12px] text-slate-500 dark:text-slate-400 line-clamp-2 mt-1 leading-snug">
+              {product.description}
+            </p>
+          </div>
+          <div className="flex items-center justify-between mt-2">
+            <div className="flex items-center gap-1">
+              <Star size={10} className="text-yellow-500 fill-yellow-500" />
+              <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400">{product.rating}</span>
+            </div>
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onAddClick) onAddClick(e);
+              }}
+              className="w-8 h-8 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/20 active:scale-90 transition-all"
+            >
+              <Plus size={18} strokeWidth={3} />
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    );
+  }
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      whileTap={{ scale: 0.98 }}
+      onClick={onClick}
+      className="bg-white dark:bg-slate-900 rounded-2xl p-3 border border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-md transition-all group relative cursor-pointer flex flex-col h-full"
+    >
+      <div className="relative aspect-square rounded-xl overflow-hidden bg-slate-50 dark:bg-slate-800 mb-3">
+        <img 
+          src={product.image} 
+          alt={product.name} 
+          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+          referrerPolicy="no-referrer"
+        />
+        {product.badge && (
+          <div className="absolute top-2 left-2 px-2 py-0.5 bg-brand-600 text-white text-[9px] font-black uppercase rounded-lg shadow-sm">
+            {product.badge === 'new' ? 'Новое' : product.badge === 'popular' ? 'Хит' : 'Топ'}
+          </div>
+        )}
+        <button 
+          className="absolute top-2 right-2 w-8 h-8 bg-white/90 backdrop-blur-md rounded-full flex items-center justify-center text-slate-400 hover:text-red-500 transition-colors shadow-sm"
+          onClick={(e) => {
+            e.stopPropagation();
+          }}
+        >
+          <Heart size={16} />
+        </button>
+      </div>
+      <div className="px-1 flex-1 flex flex-col">
+        <span className="text-sm font-black text-slate-900 dark:text-white block mb-0.5">{product.price}</span>
+        <h4 className="text-[13px] font-bold text-slate-800 dark:text-slate-200 mb-0.5 line-clamp-1">{product.name}</h4>
+        <p className="text-[11px] text-slate-400 dark:text-slate-500 mb-1">{product.quantity || '1 кг'}</p>
+        
+        <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 mb-3 leading-tight">
+          {product.description}
+        </p>
+
+        <div className="mt-auto flex items-center justify-between">
+          <div className="flex items-center gap-1">
+            <Star size={10} className="text-yellow-500 fill-yellow-500" />
+            <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400">{product.rating}</span>
+          </div>
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onAddClick) onAddClick(e);
+            }}
+            className="w-8 h-8 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/20 active:scale-90 transition-all"
+          >
+            <Plus size={18} strokeWidth={3} />
+          </button>
         </div>
       </div>
-    </div>
-    <button 
-      className="absolute -bottom-1 -right-1 w-9 h-9 bg-brand-600 text-white rounded-xl flex items-center justify-center shadow-lg active:scale-90 transition-transform border-4 border-white dark:border-slate-950"
-      onClick={(e) => {
-        e.stopPropagation();
-      }}
-    >
-      <Plus size={18} />
-    </button>
-  </motion.div>
-);
+    </motion.div>
+  );
+};
 
 const CATEGORIES_LIST = [
-  { id: 'seeds', name: 'Семена', icon: Sprout, color: 'bg-emerald-50 text-emerald-600' },
-  { id: 'fert', name: 'Удобрения', icon: Droplets, color: 'bg-blue-50 text-blue-600' },
-  { id: 'veg', name: 'Овощи', icon: ShoppingBag, color: 'bg-orange-50 text-orange-500' },
   { id: 'fruit', name: 'Фрукты', icon: Apple, color: 'bg-red-50 text-red-500' },
+  { id: 'veg', name: 'Овощи', icon: ShoppingBag, color: 'bg-orange-50 text-orange-500' },
+  { id: 'dairy', name: 'Молочные', icon: Milk, color: 'bg-blue-50 text-blue-600' },
+  { id: 'meat', name: 'Мясо', icon: Beef, color: 'bg-red-50 text-red-600' },
+  { id: 'seeds', name: 'Семена', icon: Sprout, color: 'bg-emerald-50 text-emerald-600' },
   { id: 'tech', name: 'Техника', icon: Truck, color: 'bg-slate-50 text-slate-600' },
-  { id: 'feed', name: 'Корма', icon: LayoutGrid, color: 'bg-amber-50 text-amber-600' },
 ];
 
 const MarketHeader = ({ onSearch }: { onSearch?: (query: string) => void }) => {
@@ -1303,12 +1519,8 @@ const MarketHeader = ({ onSearch }: { onSearch?: (query: string) => void }) => {
   };
 
   return (
-    <div className="bg-brand-600 dark:bg-brand-700 pt-8 pb-20 px-6 rounded-b-[3rem] relative overflow-hidden">
-      {/* Abstract Background Patterns */}
-      <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />
-      <div className="absolute bottom-0 left-0 w-48 h-48 bg-black/5 rounded-full translate-y-1/2 -translate-x-1/2 blur-2xl" />
-      
-      {/* Search Bar Integrated into Header */}
+    <div className="bg-white dark:bg-slate-950 pt-4 pb-6 px-6 transition-colors duration-500">
+      {/* Search Bar */}
       <div className="relative z-10">
         <form onSubmit={handleSearch} className="relative flex items-center gap-3">
           <div className="relative flex-1">
@@ -1317,12 +1529,12 @@ const MarketHeader = ({ onSearch }: { onSearch?: (query: string) => void }) => {
               type="text" 
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Поиск товаров..." 
-              className="w-full bg-white dark:bg-slate-900 border-none rounded-2xl py-4 pl-12 pr-4 text-sm font-bold focus:ring-2 focus:ring-brand-500/20 transition-all shadow-xl shadow-brand-900/20 dark:shadow-none dark:text-white"
+              placeholder="Поиск продуктов..." 
+              className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl py-3.5 pl-11 pr-4 text-sm font-medium focus:ring-2 focus:ring-brand-500/20 transition-all dark:text-white"
             />
           </div>
-          <button type="button" className="w-12 h-12 bg-white dark:bg-slate-900 rounded-2xl flex items-center justify-center text-slate-600 dark:text-slate-400 shadow-xl shadow-brand-900/20 dark:shadow-none active:scale-90 transition-transform">
-            <SlidersHorizontal size={20} />
+          <button type="button" className="w-12 h-12 bg-brand-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-brand-600/20 active:scale-90 transition-transform">
+            <Filter size={20} />
           </button>
         </form>
       </div>
@@ -1386,14 +1598,14 @@ const MarketCategories = ({ onCategoryClick }: { onCategoryClick: (cat: string) 
         Смотреть все
       </button>
     </div>
-    <div className="grid grid-cols-3 gap-y-8 gap-x-4 px-6">
+    <div className="flex gap-4 overflow-x-auto no-scrollbar px-6">
       {CATEGORIES_LIST.map((cat) => (
         <div 
           key={cat.id} 
           onClick={() => onCategoryClick(cat.name)}
-          className="flex flex-col items-center gap-3 cursor-pointer group"
+          className="flex flex-col items-center gap-3 cursor-pointer group shrink-0"
         >
-          <div className="w-20 h-20 rounded-[2rem] bg-white dark:bg-slate-900 flex items-center justify-center text-brand-600 dark:text-brand-400 shadow-xl shadow-slate-200/50 dark:shadow-none group-hover:scale-110 transition-transform border border-slate-50 dark:border-slate-800">
+          <div className={`w-20 h-20 rounded-[2rem] ${cat.color.split(' ')[0]} dark:bg-slate-900 flex items-center justify-center ${cat.color.split(' ')[1]} shadow-xl shadow-slate-200/50 dark:shadow-none group-hover:scale-110 transition-transform border border-slate-50 dark:border-slate-800`}>
             <cat.icon size={32} strokeWidth={2.5} />
           </div>
           <span className="text-[11px] font-black text-slate-700 dark:text-slate-300 text-center leading-tight uppercase tracking-wider">{cat.name}</span>
@@ -1403,64 +1615,103 @@ const MarketCategories = ({ onCategoryClick }: { onCategoryClick: (cat: string) 
   </div>
 );
 
-const FlashSaleSection = ({ onProductClick }: { onProductClick: (id: string) => void }) => {
-  const [activeTab, setActiveTab] = useState('Все');
-  const [timeLeft, setTimeLeft] = useState({ hours: 2, minutes: 12, seconds: 56 });
-  const tabs = ['Все', 'Новинки', 'Популярные', 'Семена'];
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev.seconds > 0) return { ...prev, seconds: prev.seconds - 1 };
-        if (prev.minutes > 0) return { ...prev, minutes: prev.minutes - 1, seconds: 59 };
-        if (prev.hours > 0) return { ...prev, hours: prev.hours - 1, minutes: 59, seconds: 59 };
-        return prev;
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const formatTime = (n: number) => n.toString().padStart(2, '0');
-
+const PopularProductsSection = ({ onProductClick }: { onProductClick: (id: string) => void }) => {
+  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'slider'>('slider');
+  const popularProducts = MOCK_PRODUCTS.filter(p => p.badge === 'popular' || p.rating >= 4.8);
+  
   return (
-    <div className="mt-12 px-6">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex flex-col gap-1">
-          <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">Молниеносная распродажа</h3>
-          <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500 text-[10px] font-bold uppercase tracking-widest">
-            <span>Заканчивается через:</span>
-            <div className="flex gap-1 text-brand-600 dark:text-brand-400 font-black">
-              <span className="bg-brand-50 dark:bg-brand-950/30 px-1.5 py-0.5 rounded-lg">{formatTime(timeLeft.hours)}</span>
-              <span className="animate-pulse">:</span>
-              <span className="bg-brand-50 dark:bg-brand-950/30 px-1.5 py-0.5 rounded-lg">{formatTime(timeLeft.minutes)}</span>
-              <span className="animate-pulse">:</span>
-              <span className="bg-brand-50 dark:bg-brand-950/30 px-1.5 py-0.5 rounded-lg">{formatTime(timeLeft.seconds)}</span>
-            </div>
-          </div>
+    <div className="mt-8">
+      <div className="flex items-center justify-between px-6 mb-4">
+        <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">Популярные</h3>
+        <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+          <button 
+            onClick={() => setViewMode('slider')}
+            className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 ${viewMode === 'slider' ? 'bg-white dark:bg-slate-700 text-brand-600 shadow-sm' : 'text-slate-400'}`}
+          >
+            <ChevronRight size={14} />
+            <span className="text-[10px] font-black uppercase tracking-wider">Слайд</span>
+          </button>
+          <button 
+            onClick={() => setViewMode('grid')}
+            className={`p-1.5 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white dark:bg-slate-700 text-brand-600 shadow-sm' : 'text-slate-400'}`}
+          >
+            <LayoutGrid size={16} />
+          </button>
+          <button 
+            onClick={() => setViewMode('list')}
+            className={`p-1.5 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white dark:bg-slate-700 text-brand-600 shadow-sm' : 'text-slate-400'}`}
+          >
+            <List size={16} />
+          </button>
         </div>
       </div>
+      
+      {viewMode === 'slider' ? (
+        <div className="flex gap-4 overflow-x-auto no-scrollbar px-6 pb-4">
+          {popularProducts.map((product) => (
+            <div key={product.id} className="w-48 shrink-0">
+              <ProductCard 
+                product={product} 
+                onClick={() => onProductClick(product.id)} 
+                viewMode="grid"
+              />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className={`px-6 pb-4 ${viewMode === 'grid' 
+          ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"
+          : "flex flex-col gap-4"
+        }`}>
+          {popularProducts.map((product) => (
+            <ProductCard 
+              key={product.id} 
+              product={product} 
+              onClick={() => onProductClick(product.id)} 
+              viewMode={viewMode}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
-      {/* Tabs */}
-      <div className="flex gap-2 overflow-x-auto no-scrollbar mb-8">
-        {tabs.map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`whitespace-nowrap px-6 py-2.5 rounded-2xl text-xs font-black transition-all ${
-              activeTab === tab
-                ? 'bg-brand-600 text-white shadow-lg shadow-brand-200 dark:shadow-none'
-                : 'bg-white dark:bg-slate-900 text-slate-400 dark:text-slate-500 border border-slate-100 dark:border-slate-800'
-            }`}
+const NewProductsSection = ({ onProductClick }: { onProductClick: (id: string) => void }) => {
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const newProducts = MOCK_PRODUCTS.filter(p => p.badge === 'new' || p.id === 'm101' || p.id === 'm3' || p.id === 'm5');
+  
+  return (
+    <div className="mt-8 px-6 pb-32">
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">Новинки</h3>
+        <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+          <button 
+            onClick={() => setViewMode('grid')}
+            className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white dark:bg-slate-700 text-brand-600 shadow-sm' : 'text-slate-400'}`}
           >
-            {tab}
+            <LayoutGrid size={18} />
           </button>
-        ))}
+          <button 
+            onClick={() => setViewMode('list')}
+            className={`p-2 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white dark:bg-slate-700 text-brand-600 shadow-sm' : 'text-slate-400'}`}
+          >
+            <List size={18} />
+          </button>
+        </div>
       </div>
-
-      {/* Product Grid */}
-      <div className="grid grid-cols-2 gap-4 pb-32">
-        {MOCK_PRODUCTS.slice(0, 6).map((product) => (
-          <ProductCard key={product.id} product={product} onClick={() => onProductClick(product.id)} />
+      
+      <div className={viewMode === 'grid' 
+        ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"
+        : "flex flex-col gap-4"
+      }>
+        {newProducts.map((product) => (
+          <ProductCard 
+            key={product.id} 
+            product={product} 
+            onClick={() => onProductClick(product.id)} 
+            viewMode={viewMode}
+          />
         ))}
       </div>
     </div>
@@ -1469,11 +1720,16 @@ const FlashSaleSection = ({ onProductClick }: { onProductClick: (id: string) => 
 
 const CatalogView = ({ onCategoryClick, onProductClick, onSearch }: { onCategoryClick: (cat: string) => void; onProductClick: (id: string) => void; onSearch?: (q: string) => void }) => {
   return (
-    <div className="bg-slate-50 dark:bg-slate-950 min-h-screen transition-colors duration-500">
+    <div className="bg-white dark:bg-slate-950 min-h-screen transition-colors duration-500">
       <MarketHeader onSearch={onSearch} />
-      <SpecialOfferCarousel />
-      <MarketCategories onCategoryClick={onCategoryClick} />
-      <FlashSaleSection onProductClick={onProductClick} />
+      
+      <div className="mt-2">
+        <MarketCategories onCategoryClick={onCategoryClick} />
+      </div>
+
+      <PopularProductsSection onProductClick={onProductClick} />
+      
+      <NewProductsSection onProductClick={onProductClick} />
     </div>
   );
 };
@@ -1482,8 +1738,23 @@ const CatalogView = ({ onCategoryClick, onProductClick, onSearch }: { onCategory
 const ProductListPage = ({ category, onBack, onProductClick, onAddClick, initialSearch = '' }: { category: string; onBack: () => void; onProductClick: (id: string) => void; onAddClick?: () => void; initialSearch?: string }) => {
   const [selectedSubcategory, setSelectedSubcategory] = useState('Все');
   const [searchQuery, setSearchQuery] = useState(initialSearch);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filteredProducts = MOCK_PRODUCTS.filter(p => {
+  useEffect(() => {
+    const q = query(collection(db, 'products'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const pList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
+      setProducts(pList);
+      setLoading(false);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'products');
+    });
+    return unsubscribe;
+  }, []);
+
+  const filteredProducts = (products.length > 0 ? products : MOCK_PRODUCTS).filter(p => {
     const matchesCategory = category === 'Весь каталог' || category === 'Новинки' || p.category === category;
     const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.description.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesSubcategory = selectedSubcategory === 'Все' || p.badge === (selectedSubcategory === 'Новинки' ? 'new' : selectedSubcategory === 'Популярные' ? 'popular' : '');
@@ -1491,14 +1762,39 @@ const ProductListPage = ({ category, onBack, onProductClick, onAddClick, initial
     return matchesCategory && matchesSearch && matchesSubcategory;
   });
 
+  if (loading && products.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[60vh]">
+        <div className="w-12 h-12 border-4 border-brand-200 border-t-brand-600 rounded-full animate-spin mb-4"></div>
+        <p className="text-slate-500 font-medium">Загрузка товаров...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="pb-24 bg-slate-50 dark:bg-slate-950 min-h-screen">
       <div className="bg-white dark:bg-slate-900 pb-4">
-        <div className="px-6 pt-4 flex items-center gap-3">
-          <button onClick={onBack} className="p-2 bg-slate-100 dark:bg-slate-800 rounded-xl text-slate-600 dark:text-slate-400">
-            <ArrowLeft size={20} />
-          </button>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white">{category}</h2>
+        <div className="px-6 pt-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button onClick={onBack} className="p-2 bg-slate-100 dark:bg-slate-800 rounded-xl text-slate-600 dark:text-slate-400">
+              <ArrowLeft size={20} />
+            </button>
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white">{category}</h2>
+          </div>
+          <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+            <button 
+              onClick={() => setViewMode('grid')}
+              className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white dark:bg-slate-700 text-brand-600 shadow-sm' : 'text-slate-400'}`}
+            >
+              <LayoutGrid size={18} />
+            </button>
+            <button 
+              onClick={() => setViewMode('list')}
+              className={`p-2 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white dark:bg-slate-700 text-brand-600 shadow-sm' : 'text-slate-400'}`}
+            >
+              <List size={18} />
+            </button>
+          </div>
         </div>
         <div className="px-6 mt-4">
           <div className="relative">
@@ -1531,13 +1827,21 @@ const ProductListPage = ({ category, onBack, onProductClick, onAddClick, initial
           )}
         </div>
         
-        <div className="grid grid-cols-2 gap-4">
+        <div className={viewMode === 'grid' 
+          ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"
+          : "flex flex-col gap-4"
+        }>
           {filteredProducts.length > 0 ? (
             filteredProducts.map(product => (
-              <ProductCard key={product.id} product={product} onClick={() => onProductClick(product.id)} />
+              <ProductCard 
+                key={product.id} 
+                product={product} 
+                onClick={() => onProductClick(product.id)} 
+                viewMode={viewMode}
+              />
             ))
           ) : (
-            <div className="col-span-2 py-20 text-center">
+            <div className="col-span-full py-20 text-center">
               <p className="text-slate-400">В этой категории пока нет товаров</p>
             </div>
           )}
@@ -1913,7 +2217,7 @@ const AIAssistantPage = () => {
   );
 };
 
-const ProfilePage = ({ user, onUpdateUser, theme, setTheme }: { user: UserProfile; onUpdateUser: (u: UserProfile) => void; theme: Theme; setTheme: (t: Theme) => void }) => {
+const ProfilePage = ({ user, onUpdateUser, theme, setTheme, onSellClick, isAuthenticated, onLoginClick }: { user: UserProfile; onUpdateUser: (u: UserProfile) => void; theme: Theme; setTheme: (t: Theme) => void; onSellClick: () => void; isAuthenticated: boolean; onLoginClick: () => void }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedUser, setEditedUser] = useState(user);
   const [activeTab, setActiveTab] = useState<'listings' | 'orders'>('listings');
@@ -1922,6 +2226,24 @@ const ProfilePage = ({ user, onUpdateUser, theme, setTheme }: { user: UserProfil
     onUpdateUser(editedUser);
     setIsEditing(false);
   };
+
+  if (!isAuthenticated) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] px-8 text-center">
+        <div className="w-20 h-20 bg-slate-100 dark:bg-slate-900 rounded-[2.5rem] flex items-center justify-center mb-6">
+          <User size={40} className="text-slate-400" />
+        </div>
+        <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Вы не вошли в систему</h2>
+        <p className="text-slate-500 dark:text-slate-400 mb-8 font-medium">Войдите, чтобы управлять своим профилем, заказами и объявлениями.</p>
+        <button 
+          onClick={onLoginClick}
+          className="w-full max-w-xs bg-brand-600 text-white py-4 rounded-2xl font-bold shadow-lg shadow-brand-100 active:scale-95 transition-transform"
+        >
+          Войти или зарегистрироваться
+        </button>
+      </div>
+    );
+  }
 
   if (isEditing) {
     return (
@@ -2014,18 +2336,27 @@ const ProfilePage = ({ user, onUpdateUser, theme, setTheme }: { user: UserProfil
             </div>
           </div>
         </div>
-        <button 
-          onClick={() => setIsEditing(true)}
-          className="p-3 bg-slate-900 dark:bg-brand-600 text-white rounded-2xl shadow-lg shadow-slate-200 dark:shadow-brand-900/20 active:scale-95 transition-all"
-        >
-          <Settings size={20} />
-        </button>
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={() => setIsEditing(true)}
+            className="p-3 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-2xl active:scale-95 transition-all"
+          >
+            <Settings size={20} />
+          </button>
+          <button 
+            onClick={() => logOut()}
+            className="p-3 bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 rounded-2xl active:scale-95 transition-all"
+            title="Выйти"
+          >
+            <LogOut size={20} />
+          </button>
+        </div>
       </div>
 
       {/* Finance Section */}
       <div className="px-6 mt-10">
         <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-5">Финансы</h3>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="bg-white dark:bg-slate-900 p-4 rounded-[32px] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col items-center text-center hover:border-red-100 dark:hover:border-red-900/50 transition-colors">
             <div className="p-2.5 bg-red-50 dark:bg-red-950/30 text-red-500 rounded-2xl mb-3">
               <ArrowDown size={22} />
@@ -2077,18 +2408,27 @@ const ProfilePage = ({ user, onUpdateUser, theme, setTheme }: { user: UserProfil
           </button>
         </div>
 
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {activeTab === 'listings' ? (
-            MOCK_LISTINGS.slice(0, 2).map(item => (
-              <div key={item.id} className="bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center gap-3">
-                <img src={item.image} referrerPolicy="no-referrer" className="w-16 h-16 rounded-xl object-cover" />
-                <div className="flex-1">
-                  <h4 className="text-sm font-bold text-slate-900 dark:text-white">{item.name}</h4>
-                  <p className="text-brand-600 font-bold text-xs mt-1">{item.price}</p>
+            <>
+              <button 
+                onClick={onSellClick}
+                className="col-span-full py-4 bg-brand-50 dark:bg-brand-900/20 border-2 border-dashed border-brand-200 dark:border-brand-800 rounded-2xl flex items-center justify-center gap-2 text-brand-600 font-bold mb-4 active:scale-95 transition-transform"
+              >
+                <Plus size={20} />
+                <span>Добавить новое объявление</span>
+              </button>
+              {MOCK_LISTINGS.slice(0, 2).map(item => (
+                <div key={item.id} className="bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center gap-3">
+                  <img src={item.image} referrerPolicy="no-referrer" className="w-16 h-16 rounded-xl object-cover" />
+                  <div className="flex-1">
+                    <h4 className="text-sm font-bold text-slate-900 dark:text-white">{item.name}</h4>
+                    <p className="text-brand-600 font-bold text-xs mt-1">{item.price}</p>
+                  </div>
+                  <ChevronRight size={18} className="text-slate-300 dark:text-slate-600" />
                 </div>
-                <ChevronRight size={18} className="text-slate-300 dark:text-slate-600" />
-              </div>
-            ))
+              ))}
+            </>
           ) : (
             MOCK_ORDERS.map(order => (
               <div key={order.id} className="bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center gap-3">
@@ -2238,37 +2578,156 @@ const SellPage = () => {
 };
 
 const AIPhotoReport = ({ onClose }: { onClose: () => void }) => {
+  const [step, setStep] = useState<'upload' | 'scanning' | 'report'>('upload');
+
+  const handleStartScan = () => {
+    setStep('scanning');
+    setTimeout(() => {
+      setStep('report');
+    }, 3000);
+  };
+
   return (
     <motion.div 
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className="fixed inset-0 z-[100] bg-slate-900/90 backdrop-blur-sm flex items-center justify-center p-6"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-xl flex items-center justify-center p-4"
     >
-      <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[40px] overflow-hidden shadow-2xl border border-white/10 dark:border-slate-800">
-        <div className="p-8">
-          <div className="w-20 h-20 bg-brand-50 dark:bg-brand-950/30 text-brand-600 dark:text-brand-400 rounded-3xl flex items-center justify-center mx-auto mb-6">
-            <Sparkles size={40} className="animate-pulse" />
+      <div className="bg-white dark:bg-slate-900 w-full max-w-md md:max-w-xl lg:max-w-2xl rounded-[3rem] overflow-hidden shadow-2xl border border-slate-200 dark:border-white/10 max-h-[90vh] overflow-y-auto no-scrollbar">
+        {step === 'upload' && (
+          <div className="p-10">
+            <div className="w-24 h-24 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 rounded-[2rem] flex items-center justify-center mx-auto mb-8 shadow-inner">
+              <Scan size={48} className="animate-pulse" />
+            </div>
+            <h3 className="text-3xl font-black text-slate-900 dark:text-white text-center mb-4 tracking-tight">AI Crop Scan</h3>
+            <p className="text-slate-500 dark:text-slate-400 text-center text-sm mb-10 leading-relaxed font-medium">
+              Загрузите фото вашего урожая для мгновенного анализа болезней, стадии роста и рекомендаций.
+            </p>
+            
+            <div className="space-y-4">
+              <button 
+                onClick={handleStartScan}
+                className="w-full py-5 bg-emerald-600 text-white rounded-3xl font-black flex items-center justify-center gap-3 shadow-xl shadow-emerald-600/20 active:scale-95 transition-all text-sm uppercase tracking-widest"
+              >
+                <Camera size={22} /> Сделать фото
+              </button>
+              <button 
+                onClick={handleStartScan}
+                className="w-full py-5 bg-slate-100 dark:bg-white/10 text-slate-900 dark:text-white rounded-3xl font-black flex items-center justify-center gap-3 active:scale-95 transition-all text-sm uppercase tracking-widest border border-slate-200 dark:border-white/5"
+              >
+                <ImageIcon size={22} /> Из галереи
+              </button>
+              <button 
+                onClick={onClose}
+                className="w-full py-4 text-slate-400 dark:text-slate-500 text-xs font-black uppercase tracking-widest hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+              >
+                Отмена
+              </button>
+            </div>
           </div>
-          <h3 className="text-2xl font-bold text-slate-900 dark:text-white text-center mb-2">AI Анализ Фото</h3>
-          <p className="text-slate-500 dark:text-slate-400 text-center text-sm mb-8 leading-relaxed">
-            Загрузите фото урожая, и я составлю полный отчет о качестве, сорте и рыночной стоимости.
-          </p>
-          
-          <div className="space-y-3">
-            <button className="w-full py-4 bg-brand-600 text-white rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-brand-200 dark:shadow-brand-900/20 active:scale-95 transition-transform">
-              <Camera size={20} /> Сделать фото
-            </button>
-            <button className="w-full py-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-2xl font-bold flex items-center justify-center gap-2 active:scale-95 transition-transform">
-              <ImageIcon size={20} /> Из галереи
-            </button>
-            <button 
-              onClick={onClose}
-              className="w-full py-4 text-slate-400 dark:text-slate-500 text-sm font-bold hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
-            >
-              Отмена
-            </button>
+        )}
+
+        {step === 'scanning' && (
+          <div className="p-12 flex flex-col items-center justify-center text-center">
+            <div className="relative w-40 h-40 mb-10">
+              <motion.div 
+                animate={{ rotate: 360 }}
+                transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+                className="absolute inset-0 border-4 border-emerald-500/20 rounded-full"
+              />
+              <motion.div 
+                animate={{ rotate: -360 }}
+                transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                className="absolute inset-4 border-4 border-emerald-500/40 border-t-emerald-500 rounded-full"
+              />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Sparkles size={48} className="text-emerald-500 animate-bounce" />
+              </div>
+            </div>
+            <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-3 uppercase tracking-tighter">Анализируем...</h3>
+            <p className="text-slate-500 dark:text-white/60 text-sm font-medium animate-pulse uppercase tracking-widest">Ищем признаки болезней и стадии роста</p>
           </div>
-        </div>
+        )}
+
+        {step === 'report' && (
+          <div className="p-0">
+            {/* Report Header */}
+            <div className="bg-emerald-600 p-8 text-white relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16 blur-2xl" />
+              <div className="relative z-10">
+                <div className="flex justify-between items-start mb-6">
+                  <div className="p-3 bg-white/20 backdrop-blur-md rounded-2xl">
+                    <FileText size={24} />
+                  </div>
+                  <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                    <X size={24} />
+                  </button>
+                </div>
+                <h3 className="text-3xl font-black tracking-tighter mb-1">Отчет AI</h3>
+                <p className="text-emerald-100 text-xs font-bold uppercase tracking-widest">ID: #AI-88291</p>
+              </div>
+            </div>
+
+            <div className="p-8 space-y-8">
+              {/* Summary Section */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-slate-50 dark:bg-white/5 p-4 rounded-3xl border border-slate-100 dark:border-white/5">
+                  <span className="text-[10px] font-black text-slate-400 dark:text-white/40 uppercase tracking-widest block mb-2">Культура</span>
+                  <p className="text-sm font-black text-slate-900 dark:text-white">Томат (Сорт: Аврора)</p>
+                </div>
+                <div className="bg-slate-50 dark:bg-white/5 p-4 rounded-3xl border border-slate-100 dark:border-white/5">
+                  <span className="text-[10px] font-black text-slate-400 dark:text-white/40 uppercase tracking-widest block mb-2">Стадия роста</span>
+                  <p className="text-sm font-black text-slate-900 dark:text-white">Цветение (75%)</p>
+                </div>
+              </div>
+
+              {/* Health Status */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-black uppercase tracking-widest text-slate-500 dark:text-white/60">Состояние здоровья</h4>
+                  <span className="px-3 py-1 bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-black rounded-full uppercase tracking-widest">Внимание</span>
+                </div>
+                <div className="bg-amber-50 dark:bg-amber-500/10 p-5 rounded-3xl border border-amber-100 dark:border-amber-500/20">
+                  <div className="flex gap-4">
+                    <div className="p-3 bg-amber-500 text-white rounded-2xl h-fit">
+                      <AlertTriangle size={20} />
+                    </div>
+                    <div>
+                      <h5 className="text-sm font-black text-amber-900 dark:text-amber-400 mb-1">Обнаружен Фитофтороз</h5>
+                      <p className="text-xs font-medium text-amber-800/70 dark:text-amber-400/70 leading-relaxed">
+                        На нижних листьях обнаружены темные пятна. Рекомендуется немедленная обработка.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Recommendations */}
+              <div className="space-y-4">
+                <h4 className="text-xs font-black uppercase tracking-widest text-slate-500 dark:text-white/60">Рекомендации AI</h4>
+                <div className="space-y-3">
+                  {[
+                    { icon: Droplets, text: 'Уменьшить полив на 20% до обработки', color: 'text-blue-500' },
+                    { icon: Sparkles, text: 'Обработать фунгицидом "Квадрис"', color: 'text-emerald-500' },
+                    { icon: Sun, text: 'Удалить пораженные листья вручную', color: 'text-amber-500' },
+                  ].map((rec, i) => (
+                    <div key={i} className="flex items-center gap-4 p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-100 dark:border-white/5">
+                      <rec.icon size={18} className={rec.color} />
+                      <p className="text-xs font-bold text-slate-700 dark:text-white/80">{rec.text}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <button 
+                onClick={onClose}
+                className="w-full py-5 bg-slate-900 dark:bg-white text-white dark:text-slate-950 rounded-3xl font-black text-sm uppercase tracking-widest shadow-xl active:scale-95 transition-all"
+              >
+                Понятно
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </motion.div>
   );
@@ -2452,7 +2911,7 @@ const CommunitiesPage = ({ onCategoryClick }: { onCategoryClick: (cat: Community
         <Users className="absolute -bottom-6 -right-6 text-brand-800 opacity-20" size={160} />
       </div>
 
-      <div className="grid gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {MOCK_COMMUNITIES.map((cat) => (
           <button 
             key={cat.id}
@@ -2484,7 +2943,7 @@ const ChatListPage = ({ category, onChatClick }: { category: CommunityCategory; 
         <h2 className="text-xl font-bold text-slate-900 dark:text-white">{category.name}</h2>
       </div>
 
-      <div className="space-y-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {category.chats.map((chat) => (
           <button 
             key={chat.id}
@@ -2577,39 +3036,29 @@ const ChatRoomPage = ({ chat }: { chat: CommunityChat }) => {
 
 const ChatFAB = () => null;
 
-const BottomNav = ({ activeTab, onTabChange }: { activeTab: View; onTabChange: (t: View) => void }) => {
+const BottomNav = ({ activeTab, onTabChange, isAdmin }: { activeTab: View; onTabChange: (t: View) => void; isAdmin?: boolean }) => {
   const tabs = [
     { id: 'home', label: 'Главная', icon: Home },
-    { id: 'market', label: 'Рынок', icon: LayoutGrid },
-    { id: 'ai', label: 'AI помощник', icon: Sparkles, special: true },
-    { id: 'communities', label: 'Сообщества', icon: Users },
+    { id: 'market', label: 'Маркет', icon: LayoutGrid },
+    { id: 'ai', label: 'ИИ Помощник', icon: Sparkles },
+    { id: 'communities', label: 'Активность', icon: Users },
     { id: 'settings', label: 'Профиль', icon: User },
   ];
 
+  if (isAdmin) {
+    tabs.push({ id: 'admin', label: 'Админ', icon: Shield });
+  }
+
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-lg border-t border-slate-100 dark:border-slate-800 px-4 py-2 flex justify-between items-end z-50 max-w-md mx-auto h-20">
+    <nav className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-lg border-t border-slate-100 dark:border-slate-800 px-4 py-2 flex justify-between items-center z-50 max-w-md md:max-w-2xl lg:max-w-4xl xl:max-w-6xl mx-auto h-16">
       {tabs.map((item) => (
         <button 
           key={item.id}
           onClick={() => onTabChange(item.id as View)}
-          className={`flex flex-col items-center transition-all relative ${
-            item.special 
-              ? 'mb-4' 
-              : 'pb-1'
-          } ${activeTab === item.id ? 'text-brand-600' : 'text-slate-400 dark:text-slate-500'}`}
+          className={`flex flex-col items-center transition-all pb-1 ${activeTab === item.id ? 'text-brand-600' : 'text-slate-400 dark:text-slate-500'}`}
         >
-          {item.special ? (
-            <div className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg transition-transform active:scale-90 ${
-              activeTab === item.id 
-                ? 'bg-brand-600 text-white shadow-brand-200 dark:shadow-brand-900/20' 
-                : 'bg-white dark:bg-slate-900 text-brand-600 dark:text-brand-400 border-2 border-brand-100 dark:border-slate-800'
-            }`}>
-              <item.icon size={32} className={activeTab === item.id ? 'fill-white/20' : ''} />
-            </div>
-          ) : (
-            <item.icon size={22} className={activeTab === item.id ? 'fill-brand-50 dark:fill-brand-900/20' : ''} />
-          )}
-          <span className={`text-[10px] font-bold mt-1 ${item.special ? 'absolute -bottom-5 whitespace-nowrap' : ''}`}>
+          <item.icon size={22} className={activeTab === item.id ? 'fill-brand-50 dark:fill-brand-900/20' : ''} />
+          <span className="text-[10px] font-bold mt-1">
             {item.label}
           </span>
         </button>
@@ -2618,10 +3067,260 @@ const BottomNav = ({ activeTab, onTabChange }: { activeTab: View; onTabChange: (
   );
 };
 
+const clearDatabase = async () => {
+  if (!auth.currentUser) return;
+  if (!window.confirm("Вы уверены, что хотите удалить ВСЕ товары и услуги? Это действие необратимо.")) return;
+
+  try {
+    const pSnap = await getDocs(collection(db, 'products'));
+    const sSnap = await getDocs(collection(db, 'services'));
+    
+    const deletePromises = [
+      ...pSnap.docs.map(d => deleteDoc(doc(db, 'products', d.id))),
+      ...sSnap.docs.map(d => deleteDoc(doc(db, 'services', d.id)))
+    ];
+    
+    await Promise.all(deletePromises);
+    alert("База данных очищена!");
+  } catch (e) {
+    console.error("Error clearing database:", e);
+    alert("Ошибка при очистке базы данных.");
+  }
+};
+
+const AdminPanel = ({ onSeed, onClear }: { onSeed: () => void; onClear: () => void }) => {
+  const [stats, setStats] = useState({ products: 0, services: 0, users: 0 });
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const pSnap = await getDocs(collection(db, 'products'));
+        const sSnap = await getDocs(collection(db, 'services'));
+        const uSnap = await getDocs(collection(db, 'users'));
+        setStats({
+          products: pSnap.size,
+          services: sSnap.size,
+          users: uSnap.size
+        });
+      } catch (e) {
+        console.error("Error fetching stats:", e);
+      }
+    };
+    fetchStats();
+    
+    // Set up real-time listeners for stats
+    const unsubP = onSnapshot(collection(db, 'products'), (s) => setStats(prev => ({ ...prev, products: s.size })));
+    const unsubS = onSnapshot(collection(db, 'services'), (s) => setStats(prev => ({ ...prev, services: s.size })));
+    const unsubU = onSnapshot(collection(db, 'users'), (s) => setStats(prev => ({ ...prev, users: s.size })));
+    
+    return () => {
+      unsubP();
+      unsubS();
+      unsubU();
+    };
+  }, []);
+
+  return (
+    <div className="pb-24 px-6 pt-6">
+      <div className="bg-slate-900 rounded-[40px] p-8 text-white mb-8 relative overflow-hidden">
+        <div className="relative z-10">
+          <h2 className="text-3xl font-bold mb-2">Админ Панель</h2>
+          <p className="text-slate-400 text-sm">Управление контентом и пользователями сайта.</p>
+        </div>
+        <Shield className="absolute -bottom-6 -right-6 text-slate-800 opacity-20" size={160} />
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-[32px] border border-slate-100 dark:border-slate-800 shadow-sm">
+          <div className="w-12 h-12 bg-brand-50 dark:bg-brand-950/30 rounded-2xl flex items-center justify-center text-brand-600 dark:text-brand-400 mb-4">
+            <LayoutGrid size={24} />
+          </div>
+          <h4 className="text-2xl font-black text-slate-900 dark:text-white">{stats.products}</h4>
+          <p className="text-xs text-slate-400 uppercase tracking-widest font-bold mt-1">Товаров</p>
+        </div>
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-[32px] border border-slate-100 dark:border-slate-800 shadow-sm">
+          <div className="w-12 h-12 bg-emerald-50 dark:bg-emerald-950/30 rounded-2xl flex items-center justify-center text-emerald-600 dark:text-emerald-400 mb-4">
+            <Activity size={24} />
+          </div>
+          <h4 className="text-2xl font-black text-slate-900 dark:text-white">{stats.services}</h4>
+          <p className="text-xs text-slate-400 uppercase tracking-widest font-bold mt-1">Услуг</p>
+        </div>
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-[32px] border border-slate-100 dark:border-slate-800 shadow-sm">
+          <div className="w-12 h-12 bg-blue-50 dark:bg-blue-950/30 rounded-2xl flex items-center justify-center text-blue-600 dark:text-blue-400 mb-4">
+            <Users size={24} />
+          </div>
+          <h4 className="text-2xl font-black text-slate-900 dark:text-white">{stats.users}</h4>
+          <p className="text-xs text-slate-400 uppercase tracking-widest font-bold mt-1">Пользователей</p>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Быстрые действия</h3>
+        <button 
+          onClick={onSeed}
+          className="w-full flex items-center gap-4 bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm hover:border-brand-100 transition-all"
+        >
+          <div className="w-12 h-12 bg-brand-50 dark:bg-brand-950/30 rounded-2xl flex items-center justify-center text-brand-600 dark:text-brand-400">
+            <Database size={24} />
+          </div>
+          <div className="flex-1 text-left">
+            <h4 className="font-bold text-slate-900 dark:text-white">Заполнить базу данных</h4>
+            <p className="text-xs text-slate-400">Добавить 150 тестовых товаров и услуг.</p>
+          </div>
+          <ChevronRight size={20} className="text-slate-300" />
+        </button>
+
+        <button 
+          onClick={onClear}
+          className="w-full flex items-center gap-4 bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm hover:border-brand-100 transition-all"
+        >
+          <div className="w-12 h-12 bg-red-50 dark:bg-red-950/30 rounded-2xl flex items-center justify-center text-red-600 dark:text-red-400">
+            <X size={24} />
+          </div>
+          <div className="flex-1 text-left">
+            <h4 className="font-bold text-slate-900 dark:text-white">Очистить базу (DEV)</h4>
+            <p className="text-xs text-slate-400">Удалить все товары и услуги.</p>
+          </div>
+          <ChevronRight size={20} className="text-slate-300" />
+        </button>
+      </div>
+    </div>
+  );
+};
+
 // --- Main App ---
 
+const LoginPage = ({ onBack }: { onBack?: () => void }) => {
+  const [isRegister, setIsRegister] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    try {
+      if (isRegister) {
+        await registerWithEmail(email, password, name);
+      } else {
+        await loginWithEmail(email, password);
+      }
+      if (onBack) onBack();
+    } catch (err: any) {
+      setError(err.message || 'Произошла ошибка');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    try {
+      await signInWithGoogle();
+      if (onBack) onBack();
+    } catch (error) {
+      console.error("Login Error:", error);
+    }
+  };
+
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[80vh] px-8 text-center bg-slate-50 dark:bg-slate-950">
+      <div className="w-20 h-20 bg-brand-600 rounded-[2rem] flex items-center justify-center mb-6 shadow-2xl shadow-brand-200 dark:shadow-brand-900/20">
+        <Shield size={40} className="text-white" />
+      </div>
+      <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-2 leading-tight">
+        {isRegister ? 'Регистрация' : 'Добро пожаловать'}
+      </h2>
+      <p className="text-slate-500 dark:text-slate-400 mb-8 font-medium text-sm">
+        {isRegister ? 'Создайте аккаунт для доступа ко всем функциям' : 'Войдите в свой аккаунт EGIN'}
+      </p>
+      
+      <form onSubmit={handleSubmit} className="w-full max-w-xs space-y-4">
+        {isRegister && (
+          <div className="relative">
+            <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <input 
+              type="text" 
+              placeholder="Ваше имя"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 py-3.5 pl-12 pr-4 rounded-2xl text-sm focus:ring-2 focus:ring-brand-500 outline-none transition-all"
+            />
+          </div>
+        )}
+        <div className="relative">
+          <Globe className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+          <input 
+            type="email" 
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 py-3.5 pl-12 pr-4 rounded-2xl text-sm focus:ring-2 focus:ring-brand-500 outline-none transition-all"
+          />
+        </div>
+        <div className="relative">
+          <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+          <input 
+            type="password" 
+            placeholder="Пароль"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 py-3.5 pl-12 pr-4 rounded-2xl text-sm focus:ring-2 focus:ring-brand-500 outline-none transition-all"
+          />
+        </div>
+
+        {error && <p className="text-xs text-red-500 font-bold">{error}</p>}
+
+        <button 
+          type="submit"
+          disabled={loading}
+          className="w-full bg-brand-600 text-white py-4 rounded-2xl font-bold shadow-lg shadow-brand-200 dark:shadow-brand-900/20 active:scale-95 transition-all disabled:opacity-50"
+        >
+          {loading ? 'Загрузка...' : isRegister ? 'Зарегистрироваться' : 'Войти'}
+        </button>
+      </form>
+
+      <div className="w-full max-w-xs flex items-center gap-4 my-6">
+        <div className="flex-1 h-[1px] bg-slate-200 dark:bg-slate-800"></div>
+        <span className="text-[10px] font-bold text-slate-400 uppercase">Или</span>
+        <div className="flex-1 h-[1px] bg-slate-200 dark:bg-slate-800"></div>
+      </div>
+
+      <button 
+        onClick={handleGoogleLogin}
+        className="w-full max-w-xs flex items-center justify-center gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 py-3.5 px-6 rounded-2xl font-bold text-slate-700 dark:text-slate-200 shadow-sm active:scale-95 transition-all hover:bg-slate-50 dark:hover:bg-slate-800"
+      >
+        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
+        <span className="text-sm">Войти через Google</span>
+      </button>
+      
+      <button 
+        onClick={() => setIsRegister(!isRegister)}
+        className="mt-6 text-sm font-bold text-brand-600 dark:text-brand-400"
+      >
+        {isRegister ? 'Уже есть аккаунт? Войти' : 'Нет аккаунта? Зарегистрироваться'}
+      </button>
+
+      {onBack && (
+        <button 
+          onClick={onBack}
+          className="mt-4 text-xs font-bold text-slate-400 uppercase tracking-widest"
+        >
+          Пропустить
+        </button>
+      )}
+    </div>
+  );
+};
+
 export default function App() {
-  const [view, setView] = useState<View>('market');
+  const { currentUser, userRole, loading: authLoading } = useAuth();
+  const [view, setView] = useState<View>('home');
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window !== 'undefined') {
       return (localStorage.getItem('theme') as Theme) || 'system';
@@ -2663,11 +3362,42 @@ export default function App() {
   const [showAIReport, setShowAIReport] = useState(false);
   const [user, setUser] = useState<UserProfile>(MOCK_USER);
 
-  const handleListingClick = (id: string) => {
-    // Find in mock products or listings
-    const product = MOCK_PRODUCTS.find(p => p.id === id) || MOCK_PRODUCTS[0];
-    setSelectedProduct(product);
-    setView('details');
+  useEffect(() => {
+    if (currentUser) {
+      setUser({
+        id: currentUser.uid,
+        name: currentUser.displayName || 'Пользователь',
+        email: currentUser.email || '',
+        avatar: currentUser.photoURL || 'https://picsum.photos/seed/user/150/150',
+        role: userRole || 'user',
+        location: 'Бишкек, Кыргызстан',
+        joinedDate: 'Март 2024'
+      });
+    }
+  }, [currentUser, userRole]);
+
+  const handleListingClick = async (id: string) => {
+    // Try mock first for speed if it's a mock ID
+    const mockProduct = MOCK_PRODUCTS.find(p => p.id === id);
+    if (mockProduct) {
+      setSelectedProduct(mockProduct);
+      setView('details');
+      return;
+    }
+
+    // Otherwise fetch from Firestore
+    try {
+      const docRef = doc(db, 'products', id);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        setSelectedProduct({ id: docSnap.id, ...docSnap.data() } as Product);
+        setView('details');
+      } else {
+        console.error("Product not found");
+      }
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, 'products/' + id);
+    }
   };
 
   const handleNewsClick = (news: NewsItem) => {
@@ -2686,14 +3416,33 @@ export default function App() {
   };
 
   const renderContent = () => {
+    if (authLoading) {
+      return (
+        <div className="flex flex-col items-center justify-center h-[60vh]">
+          <div className="w-12 h-12 border-4 border-brand-200 border-t-brand-600 rounded-full animate-spin mb-4"></div>
+          <p className="text-slate-500 font-medium">Загрузка...</p>
+        </div>
+      );
+    }
+
+    // Protected views that require login
+    const protectedViews: View[] = ['sell', 'admin', 'chat_room', 'community_chats'];
+    if (protectedViews.includes(view) && !currentUser) {
+      return <LoginPage onBack={() => setView('home')} />;
+    }
+
     switch (view) {
       case 'home':
         return (
           <main className="pb-24 -mt-24">
-            <UnifiedAICard />
-            <div className="relative z-20 -mt-10 bg-white dark:bg-slate-950 rounded-t-[3rem] pt-10">
-              <ActionButtons onMarketClick={() => setView('market')} />
-              <ListingsSection onListingClick={handleListingClick} />
+            <UnifiedAICard onScanClick={() => setShowAIReport(true)} />
+            <div className="relative z-20 -mt-10 bg-white dark:bg-slate-950 rounded-t-[3rem] pt-10 grid grid-cols-1 md:grid-cols-2 gap-x-8">
+              <div className="md:col-span-2">
+                <ActionButtons onMarketClick={() => setView('market')} onAIClick={() => setView('ai')} />
+              </div>
+              <div className="md:col-span-2">
+                <ListingsSection onListingClick={handleListingClick} />
+              </div>
               <NewsSection onNewsClick={handleNewsClick} />
               <BlogSection onPostClick={handleNewsClick} />
               <ReviewsSection />
@@ -2703,6 +3452,8 @@ export default function App() {
         );
       case 'market':
         return <MarketplacePage onProductClick={handleListingClick} onAddClick={() => setView('sell')} />;
+      case 'admin':
+        return userRole === 'admin' ? <AdminPanel onSeed={seedDatabase} onClear={clearDatabase} /> : <div className="p-12 text-center">Доступ запрещен</div>;
       case 'details':
         return selectedProduct ? (
           <ProductDetailsPage 
@@ -2731,8 +3482,18 @@ export default function App() {
         return selectedChat ? <ChatRoomPage chat={selectedChat} /> : null;
       case 'sell':
         return <SellPage />;
+      case 'login':
+        return <LoginPage onBack={() => setView('home')} />;
       case 'settings':
-        return <ProfilePage user={user} onUpdateUser={setUser} theme={theme} setTheme={setTheme} />;
+        return <ProfilePage 
+          user={user} 
+          onUpdateUser={setUser} 
+          theme={theme} 
+          setTheme={setTheme} 
+          onSellClick={() => setView('sell')} 
+          isAuthenticated={!!currentUser}
+          onLoginClick={() => setView('login')}
+        />;
       default:
         return (
           <div className="flex flex-col items-center justify-center h-[60vh] text-slate-400 px-12 text-center">
@@ -2753,7 +3514,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 max-w-md mx-auto shadow-2xl relative transition-colors duration-300">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 max-w-md md:max-w-2xl lg:max-w-4xl xl:max-w-6xl mx-auto shadow-2xl relative transition-colors duration-300">
       <Header 
         title={
           view === 'details' ? (selectedProduct?.name || 'Детали') : 
@@ -2774,9 +3535,14 @@ export default function App() {
           else if (view === 'news_details') setView('home');
           else if (view === 'community_chats') setView('communities');
           else if (view === 'chat_room') setView('community_chats');
+          else if (view === 'sell') setView('market');
+          else if (view === 'ai') setView('home');
+          else if (view === 'market') setView('home');
+          else if (view === 'communities') setView('home');
+          else if (view === 'settings') setView('home');
+          else if (view === 'login') setView('home');
           else setView('home');
         }}
-        onAIClick={() => setView('ai')}
         onMessageClick={() => setView('communities')}
         onCartClick={() => setView('market')}
         onAddClick={view === 'market' ? () => setView('sell') : undefined}
@@ -2805,7 +3571,11 @@ export default function App() {
         </>
       )}
 
-      <BottomNav activeTab={view === 'community_chats' || view === 'chat_room' ? 'communities' : view} onTabChange={(t) => setView(t)} />
+      <BottomNav 
+        activeTab={view === 'community_chats' || view === 'chat_room' ? 'communities' : view} 
+        onTabChange={(t) => setView(t)} 
+        isAdmin={userRole === 'admin'}
+      />
     </div>
   );
 }
